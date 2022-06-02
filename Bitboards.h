@@ -17,6 +17,8 @@ bitset<64> Occupied = Wpieces | Bpieces;
 
 bitset<64> EPTargets(0);
 
+bitset<4> castlingRights(15);
+
 
 constexpr bitset<64> DarkSquares(0xAA55AA55AA55AA55);
 constexpr bitset<64> LightSquares(0x55AA55AA55AA55AA);
