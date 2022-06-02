@@ -55,7 +55,38 @@ void display() {
 
 	drawBoard();
 
-	drawPiece(0, 0, white, q);
+	for (int sq = 0; sq < 64; sq++) {
+		if (!Occupied.test(sq)) continue;
+
+		int rank = sq / 8;
+		int file = sq % 8;
+
+		if      (Wp.test(sq)) 
+			drawPiece(rank, file, white, p);
+		else if (Bp.test(sq)) 
+			drawPiece(rank, file, black, p);
+		else if (Wr.test(sq)) 
+			drawPiece(rank, file, white, r);
+		else if (Br.test(sq)) 
+			drawPiece(rank, file, black, r);
+		else if (Wn.test(sq)) 
+			drawPiece(rank, file, white, n);
+		else if (Bn.test(sq)) 
+			drawPiece(rank, file, black, n);
+		else if (Wb.test(sq)) 
+			drawPiece(rank, file, white, b);
+		else if (Bb.test(sq)) 
+			drawPiece(rank, file, black, b);
+		else if (Wq.test(sq)) 
+			drawPiece(rank, file, white, q);
+		else if (Bq.test(sq)) 
+			drawPiece(rank, file, black, q);
+		else if (Wk.test(sq)) 
+			drawPiece(rank, file, white, k);
+		else if (Bk.test(sq)) 
+			drawPiece(rank, file, black, k);
+	}
+
 
 	glDisable(GL_BLEND);
 	glutSwapBuffers();
@@ -93,9 +124,12 @@ void drawLine(float x1, float y1, float x2, float y2, Colour c) {
 	glEnd();
 }
 
-void drawPiece(float x, float y, Colour c, Type t) {
+void drawPiece(float rank, float file, Colour c, Type t) {
 	double w = (sqW * 0.75) / double(screenWidth);
 	double h = (sqH * 0.75) / double(screenHeight);
+
+	double x = file * sqW / double(screenWidth) - 0.762;
+	double y = rank * sqH / double(screenHeight) - 0.762;
 	switch (t) {
 	case p:
 		drawLine(x, y - h / 2., x, y + h / 2., c);
@@ -115,8 +149,8 @@ void drawPiece(float x, float y, Colour c, Type t) {
 		drawLine(x - w / 2., y - h / 2., x + w / 2., y + h / 2., c);
 		break;
 	case r:
-		drawLine(x - w / 2., y + h / 2., x + w / 2., y - h / 2., c);
-		drawLine(x - w / 2., y - h / 2., x + w / 2., y + h / 2., c);
+		drawLine(x - w / 2., y, x + w / 2., y, c);
+		drawLine(x, y - h / 2., x, y + h / 2., c);
 		break;
 	case q:
 		drawLine(x - w / 2., y + h / 2., x + w / 2., y - h / 2., c);
@@ -130,6 +164,7 @@ void drawPiece(float x, float y, Colour c, Type t) {
 		drawLine(x + w / 2, y - h / 2, x + w / 2, y + h / 2, c);
 		drawLine(x + w / 2, y + h / 2, x - w / 2, y + h / 2, c);
 		drawLine(x - w / 2, y + h / 2, x - w / 2, y - h / 2, c);
+		break;
 	}
 }
 
@@ -138,8 +173,8 @@ void drawBoard() {
 	double h = sqH / double(screenHeight);
 	for (int i = 0; i < 8; i++){
 		for (int j = 0; j < 8; j++) {
-			double x = i * w - 0.762;
-			double y = j * h - 0.762;
+			double x = j * w - 0.762;
+			double y = i * h - 0.762;
 			glBegin(GL_POLYGON);
 			(i + j) % 2 == 0 ?
 				glColor3f(1.0f, 0.75f, 0.5f):
@@ -152,6 +187,7 @@ void drawBoard() {
 		}
 	}
 }
+
 
 
 //takes in a FEN string and updates the bitboards
@@ -187,11 +223,11 @@ void loadFromFen(string fen) {
 
 	//=Piece Positions=======================================================0=|
 	Wp.reset();	Wr.reset();
-	Wk.reset();	Wb.reset();
+	Wn.reset();	Wb.reset();
 	Wq.reset();	Wk.reset();
 
 	Bp.reset();	Br.reset();
-	Bk.reset();	Bb.reset();
+	Bn.reset();	Bb.reset();
 	Bq.reset();	Bk.reset();
 
 	nbPiecesOnBoard = 0;
@@ -205,33 +241,33 @@ void loadFromFen(string fen) {
 		nbPiecesOnBoard++;
 		c == 'P' ?
 			Wp.set(pos, 1) :
-			c == 'p' ?
+		c == 'p' ?
 			Bp.set(pos, 1) :
-			c == 'R' ?
+		c == 'R' ?
 			Wr.set(pos, 1) :
-			c == 'r' ?
+		c == 'r' ?
 			Br.set(pos, 1) :
-			c == 'N' ?
-			Wk.set(pos, 1) :
-			c == 'n' ?
-			Bk.set(pos, 1) :
-			c == 'B' ?
+		c == 'N' ?
+			Wn.set(pos, 1) :
+		c == 'n' ?
+			Bn.set(pos, 1) :
+		c == 'B' ?
 			Wb.set(pos, 1) :
-			c == 'b' ?
+		c == 'b' ?
 			Bb.set(pos, 1) :
-			c == 'Q' ?
+		c == 'Q' ?
 			Wq.set(pos, 1) :
-			c == 'q' ?
+		c == 'q' ?
 			Bq.set(pos, 1) :
-			c == 'K' ?
+		c == 'K' ?
 			Wk.set(pos, 1) :
-			c == 'k' ?
+		c == 'k' ?
 			Bk.set(pos, 1) : __noop;
 		pos++;
 	}
 
-	Wpieces = Wp| Wr| Wk| Wb| Wq| Wk;
-	Bpieces = Bp| Br| Bk| Bb| Bq| Bk;
+	Wpieces = Wp| Wr| Wn| Wb| Wq| Wk;
+	Bpieces = Bp| Br| Bn| Bb| Bq| Bk;
 
 	Occupied = Wpieces | Bpieces;
 
@@ -295,11 +331,11 @@ int main(int argc, char** argv) {
 	if (GLEW_OK != err)
 		std::cout << " GLEW ERROR" << std::endl;
 
-	loadFromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ");
+	//loadFromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ");
 	
-	//loadFromFen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 ");
+	loadFromFen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 ");
 	
-	//loadFromFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1 ");
+	loadFromFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1 ");
 	
 	//loadFromFen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1 ");
 	//loadFromFen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1 ");
@@ -308,6 +344,7 @@ int main(int argc, char** argv) {
 	
 	//loadFromFen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ");
 
+	std::cout << Wn.to_string() << endl;
 	
 	init();
 	glutDisplayFunc(display);
