@@ -1,0 +1,22 @@
+checklist to follow for the progress of the project:
+=------------------------------------Game-------------------------------------=
+ - Display the board
+ - Display the pieces
+ - Allow the pieces to be moved by the mouse
+ - Detect when the king is in check
+ - Restrict the piece movements to the allowed moves
+ - Detect when the game is over (checkmate or stalemate)
+ - Display the allowed moves when holding a piece or after clicking on a piece
+ - Implement castling
+ - Implement en passant
+ - Implememt promotion
+ - Check that the move generation is correct using perft
+ =------------------------------------AI--------------------------------------=
+ - Make basic board evaluation method (material only)
+ - allow the computer to make a move based on the best next board
+ - make basic minimax algoritm
+ - add alpha-beta pruning
+ - add move ordering
+ - implement transposition tables
+ - implement random book openings
+ - improve the evaluation method
