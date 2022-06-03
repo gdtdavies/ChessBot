@@ -1,6 +1,7 @@
 checklist to follow for the progress of the project:
 =------------------------------------Game-------------------------------------=
  - Display the board
+ - Create FEN string reader
  - Display the pieces
  - Allow the pieces to be moved by the mouse
  - Detect when the king is in check
