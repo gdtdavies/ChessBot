@@ -1,6 +1,7 @@
 #include<iostream>
 #include<string>
 #include<bitset>
+#include<vector>
 
 //--- OpenGL ---
 #include "GL\glew.h"
@@ -35,6 +36,8 @@ const enum enumSquare : int {
 #include "LookupBitBoards/king.h"
 #include "LookupBitBoards/slidingPieces.h"
 
+#include "Move.h"
+
 int screenWidth = 900, screenHeight = 900;
 int sqW, sqH;
 glm::mat4 ViewMatrix;					// matrix for the modelling and viewing
@@ -52,19 +55,27 @@ knightAttacks nA;
 slidingAttacks sA;
 kingAttacks kA;
 
+vector<Move> movesMade;
+
+bitset<64> attacksToDisplay(0);
+
+bool Checkmate = false;
+bool Check = false;
 
 //-------------------------------------------------------------------------------------------------
 void mouseCallback(int button, int state, int x, int y);
 void drawPiece(int x, int y, Colour c, Type t);
 void drawBoard();
 void drawSelected(int rank, int file);
-void drawAttacks(enumSquare sq);
+void drawAttacks(bitset<64>);
+bitset<64> getAttacks(enumSquare sq);
 
 void makeMove(enumSquare origin, enumSquare target, Colour c, Type t);
 bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t);
 bitset<64> getLegalCaptures(enumSquare sq, Colour c, Type t);
 
 bool isCheck(Colour colourInCheck);
+bool isCheckMate(Colour colourInCheck);
 
 Colour getPieceColour(int pos);
 Type getPieceType(int pos);
@@ -93,13 +104,12 @@ void display() {
 
 	if (originSq != null) {
 		drawSelected(originSq / 8, originSq % 8);
-		drawAttacks(originSq);
+		drawAttacks(attacksToDisplay);
 	}
 	
-	if (isCheck(white)) 
-		cout << "white is in check" << endl;
-	if (isCheck(black))
-		cout << "black is in check" << endl;
+	if (Checkmate)
+		cout << "checkmate" << endl;
+
 
 	for (int sq = 0; sq < 64; sq++) {
 		if (!Occupied.test(sq)) continue;
@@ -167,8 +177,10 @@ void mouseCallback(int button, int state, int x, int y) {
 		if (squareX - width / 2 < x && x < squareX + width / 2) {
 			if (squareY - height / 2 < y && y < squareY + height / 2) {
 				if(Wpieces.test(sq) && turn == white || Bpieces.test(sq) && turn == black) {
-					if (originSq != static_cast<enumSquare>(sq)) 
+					if (originSq != static_cast<enumSquare>(sq)) {
 						originSq = static_cast<enumSquare>(sq);
+						attacksToDisplay = getAttacks(originSq);
+					}
 					else 
 						originSq = null;
 					return;
@@ -194,9 +206,10 @@ void mouseCallback(int button, int state, int x, int y) {
 				
 				makeMove(originSq, targetSq, originColour, originType);
 
+				Checkmate = isCheckMate(turn);
+
 				originSq = null;
-				turn == white ? turn = black : turn = white;
-								
+
 			}
 		}
 	}
@@ -299,11 +312,9 @@ void drawSelected(int rank, int file) {
 	glEnd();
 }
 
-void drawAttacks(enumSquare sq) {
-	bitset<64> moves = getLegalMoves(sq, getPieceColour(sq), getPieceType(sq));
-	bitset<64> captures = getLegalCaptures(sq, getPieceColour(sq), getPieceType(sq));
+void drawAttacks(bitset<64> attacks) {
 	for (int i = 0; i < 64; i++) {
-		if (!(moves|captures).test(i)) continue;
+		if (!attacks.test(i)) continue;
 		int rank = i / 8;
 		int file = i % 8;
 
@@ -314,7 +325,8 @@ void drawAttacks(enumSquare sq) {
 		double cy = rank * sqH / double(screenHeight) - 0.762;
 		
 		glBegin(GL_LINE_LOOP);
-		moves.test(i) ? glColor3f(0.0f, 1.0f, 0.0f) : glColor3f(1.0f, 0.0f, 0.0f);
+		
+		getPieceType(i) == None ? glColor3f(0.0f, 1.0f, 0.0f) : glColor3f(1.0f, 0.0f, 0.0f);
 		for (int j = 0; j < 20; j++) {
 			float theta = 2.0f * 3.1415926f * float(j) / float(20);//get the current angle 
 			float x = w/2 * cosf(theta);//calculate the x component 
@@ -325,9 +337,22 @@ void drawAttacks(enumSquare sq) {
 	}
 }
 
+bitset<64> getAttacks(enumSquare sq) {
+	bitset<64> moves = getLegalMoves(sq, getPieceColour(sq), getPieceType(sq));
+	bitset<64> captures = getLegalCaptures(sq, getPieceColour(sq), getPieceType(sq));
+	return moves | captures;
+}
+
 //================||==================||==================||==================||==================>>
 
 void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
+	
+	Move m = Move(origin, target, c, t);
+	
+	Type tt = getPieceType(target);
+	if (tt != None)
+		m.setTakenType(tt);
+	
 	if (c == white) {
 		Bp.set(target, 0); Bn.set(target, 0); Bb.set(target, 0);
 		Br.set(target, 0); Bq.set(target, 0); Bk.set(target, 0);
@@ -402,7 +427,79 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 	Wpieces = Wp | Wn | Wb | Wr | Wq | Wk;
 	Bpieces = Bp | Bn | Bb | Br | Bq | Bk;
 	Occupied = Wpieces | Bpieces;
+
+	cout << "turn before = " << turn << endl;
+	turn = turn == white ? black : white;
+	cout << "turn after = " << turn << endl;
+
+	movesMade.push_back(m);
 }
+
+
+void unmakeMove() {
+	if (movesMade.empty()) return;
+	Move move = movesMade.back();
+
+
+	//set the destination to 0 in all the bitboards
+	Wp.set(move.getDestination(), 0); Bp.set(move.getDestination(), 0);
+	Wr.set(move.getDestination(), 0); Br.set(move.getDestination(), 0);
+	Wn.set(move.getDestination(), 0); Bn.set(move.getDestination(), 0);
+	Wb.set(move.getDestination(), 0); Bb.set(move.getDestination(), 0);
+	Wq.set(move.getDestination(), 0); Bq.set(move.getDestination(), 0);
+	Wk.set(move.getDestination(), 0); Bk.set(move.getDestination(), 0);
+
+	//reset the origin back to what it was
+	if (move.getType() == p)
+		move.getColour() == white ? Wp.set(move.getOrigin(), 1) : Bp.set(move.getOrigin(), 1);
+	if (move.getType() == r)
+		move.getColour() == white ? Wr.set(move.getOrigin(), 1) : Br.set(move.getOrigin(), 1);
+	if (move.getType() == n)
+		move.getColour() == white ? Wn.set(move.getOrigin(), 1) : Bn.set(move.getOrigin(), 1);
+	if (move.getType() == b)
+		move.getColour() == white ? Wb.set(move.getOrigin(), 1) : Bb.set(move.getOrigin(), 1);
+	if (move.getType() == q)
+		move.getColour() == white ? Wq.set(move.getOrigin(), 1) : Bq.set(move.getOrigin(), 1);
+	if (move.getType() == k)
+		move.getColour() == white ? Wk.set(move.getOrigin(), 1) : Bk.set(move.getOrigin(), 1);
+
+	//if take, put the piece back
+	if (move.isTake()) {
+		if (move.getTakenType() == p)
+			move.getColour() == white ? Bp.set(move.getDestination(), 1) : Wp.set(move.getDestination(), 1);
+		else if (move.getTakenType() == r)
+			move.getColour() == white ? Br.set(move.getDestination(), 1) : Wr.set(move.getDestination(), 1);
+		else if (move.getTakenType() == n)
+			move.getColour() == white ? Bn.set(move.getDestination(), 1) : Wn.set(move.getDestination(), 1);
+		else if (move.getTakenType() == b)
+			move.getColour() == white ? Bb.set(move.getDestination(), 1) : Wb.set(move.getDestination(), 1);
+		else if (move.getTakenType() == q)
+			move.getColour() == white ? Bq.set(move.getDestination(), 1) : Wq.set(move.getDestination(), 1);
+		else if (move.getTakenType() == k)
+			move.getColour() == white ? Bk.set(move.getDestination(), 1) : Wk.set(move.getDestination(), 1);
+
+		nbPiecesOnBoard++;
+	}
+	//TODO: undo castle
+
+
+	//if it was a diagonal pawn move but wasn't a take, then it was an en passent
+	//TODO: undo EP
+
+	//update the occupied bitboard
+	Wpieces = Wp | Wr | Wn | Wb | Wq | Wk;
+	Bpieces = Bp | Br | Bn | Bb | Bq | Bk;
+	Occupied = Wpieces | Bpieces;
+
+	HMcounter--;
+	if (move.getColour() == black)
+		FMcounter--;
+
+	turn = turn == white ? black : white;
+	movesMade.pop_back();
+}
+
+//================||==================||==================||==================||==================>>
 
 //returns the type of the piece in the entered square
 Type getPieceType(int square) {
@@ -422,94 +519,335 @@ Colour getPieceColour(int square) {
 	return NA;
 }
 
+int getFirstOfRank(int square) {
+	return square - square % 8;
+}
+
+int getLastOfRank(int square) {
+	return square + 7 - square % 8;
+}
+
 //================||==================||==================||==================||==================>>
 
 bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t) {
-	bitset<64> moves(0);
+	bitset<64> moves(0),  mask(0);
 	switch (t) {
 	case p:
 		if (c == white) {
-			moves.set(sq + 8, 1);
-			if(sq < 16 && !Occupied.test(sq+8))
-				moves.set(sq + 16, 1);
+			if (Occupied.test(sq + 8)) break;
+			makeMove(sq, static_cast<enumSquare>(sq + 8), c, t);
+			if(!isCheck(c)) moves.set(sq + 8, 1);
+			unmakeMove();
+			if (sq < 16 && !Occupied.test(sq + 16)) {
+				makeMove(sq, static_cast<enumSquare>(sq + 16), c, t);
+				if (!isCheck(c)) moves.set(sq + 16, 1);
+				unmakeMove();
+			}				
 		}
 		else {
-			moves.set(sq - 8, 1);
-			if (sq >= 48 && !Occupied.test(sq - 8))
-				moves.set(sq - 16, 1);
+			if (Occupied.test(sq - 8)) break;
+			makeMove(sq, static_cast<enumSquare>(sq - 8), c, t);
+			if (!isCheck(c)) moves.set(sq - 8, 1);
+			unmakeMove();
+			if (sq >= 48 && !Occupied.test(sq - 8) && !Occupied.test(sq - 16)) {
+				makeMove(sq, static_cast<enumSquare>(sq - 16), c, t);
+				if (!isCheck(c)) moves.set(sq - 16, 1);
+				unmakeMove();
+			}
 		}
 		break;
 	case n:
-		moves = nA.getKnightAttacks(sq) & ~Occupied;
+		mask = nA.getKnightAttacks(sq) & ~Occupied;
 		break;
 	case b:
-		moves = sA.getBishopAttacks(Occupied, sq) & ~Occupied;
+		mask = sA.getBishopAttacks(Occupied, sq) & ~Occupied;
 		break;
 	case r:
-		moves = sA.getRookAttacks(Occupied, sq) & ~Occupied;
+		mask = sA.getRookAttacks(Occupied, sq) & ~Occupied;
 		break;
 	case q:
-		moves = sA.getQueenAttacks(Occupied, sq) & ~Occupied;
+		mask = sA.getQueenAttacks(Occupied, sq) & ~Occupied;
 		break;
 	case k:
-		moves = kA.getKingAttacks(sq) & ~Occupied;
+		mask = kA.getKingAttacks(sq) & ~Occupied;
 		break;
 	}
+	if (t == p) return moves;
+	
+	for (int sq2 = 0; sq2 < 64; sq2++) {
+		if (!mask.test(sq2)) continue;
+
+		makeMove(sq, static_cast<enumSquare>(sq2), c, t);
+		if (!isCheck(c))
+			moves.set(sq2, 1);
+		unmakeMove();
+	}
+	
 	return moves;
 }
 
 bitset<64> getLegalCaptures(enumSquare sq, Colour c, Type t) {
-	bitset<64> captures(0);
+	bitset<64> captures(0), mask(0);
 	bitset<64> opponentBB = c == white ? Bpieces : Wpieces;
 	switch (t) {
 	case p:
 		if (c == white) {
-			if(sq % 8 > 0 && opponentBB.test(sq + 7))
-				captures.set(sq + 7, 1);
-			if (sq % 8 < 7 && opponentBB.test(sq + 9))
-				captures.set(sq + 9, 1);
+			if (sq >= 56) break;
+			if (sq % 8 > 0 && opponentBB.test(sq + 7)) {
+				makeMove(sq, static_cast<enumSquare>(sq + 7), c, t);
+				if(!isCheck(c)) captures.set(sq + 7, 1);
+				unmakeMove();
+			}
+			if (sq % 8 < 7 && opponentBB.test(sq + 9)) {
+				makeMove(sq, static_cast<enumSquare>(sq + 9), c, t);
+				if (!isCheck(c)) captures.set(sq + 9, 1);
+				unmakeMove();
+			}
 		}
 		else {
-			if (sq % 8 > 0 && opponentBB.test(sq - 9))
-				captures.set(sq - 9, 1);
-			if (sq % 8 < 7 && opponentBB.test(sq - 7))
-				captures.set(sq - 7, 1);
+			if (sq < 8) break;
+			if (sq % 8 > 0 && opponentBB.test(sq - 9)) {
+				makeMove(sq, static_cast<enumSquare>(sq - 9), c, t);
+				if (!isCheck(c)) captures.set(sq - 9, 1);
+				unmakeMove();
+			}
+			if (sq % 8 < 7 && opponentBB.test(sq - 7)) {
+				makeMove(sq, static_cast<enumSquare>(sq - 7), c, t);
+				if (!isCheck(c)) captures.set(sq - 7, 1);
+				unmakeMove();
+			}
 		}
 		break;
 	case n:
-		captures = nA.getKnightAttacks(sq) & opponentBB;
+		mask = nA.getKnightAttacks(sq) & opponentBB;
 		break;
 	case b:
-		captures = sA.getBishopAttacks(Occupied, sq) & opponentBB;
+		mask = sA.getBishopAttacks(Occupied, sq) & opponentBB;
 		break;
 	case r:
-		captures = sA.getRookAttacks(Occupied, sq) & opponentBB;
+		mask = sA.getRookAttacks(Occupied, sq) & opponentBB;
 		break;
 	case q:
-		captures = sA.getQueenAttacks(Occupied, sq) & opponentBB;
+		mask = sA.getQueenAttacks(Occupied, sq) & opponentBB;
 		break;
 	case k:
-		captures = kA.getKingAttacks(sq) & opponentBB;
+		mask = kA.getKingAttacks(sq) & opponentBB;
 		break;
 	}
+
+	if (t == p) return captures;
+
+	for (int sq2 = 0; sq2 < 64; sq2++) {
+		if (!mask.test(sq2)) continue;
+
+		makeMove(sq, static_cast<enumSquare>(sq2), c, t);
+		if (!isCheck(c))
+			captures.set(sq2, 1);
+		unmakeMove();
+	}
+
 	return captures;
 }
 
 //================||==================||==================||==================||==================>>
 
 bool isCheck(Colour colourInCheck) {
-	bitset<64> opponentBB = colourInCheck == white ? Bpieces : Wpieces;
-	Colour opponentColour = colourInCheck == white ? black : white;
+	bitset<64> king = colourInCheck == white ? Wk : Bk;
+	const enum dirs { SW = -9, S = -8, SE = -7, W = -1, E = 1, NW = 7, N = 8, NE = 9 };
+	//find king position
+	int kingPos = 0;
 	for (int sq = 0; sq < 64; sq++) {
-		if (!opponentBB.test(sq)) continue;
-		bitset<64> captures = getLegalCaptures(static_cast<enumSquare>(sq), opponentColour, getPieceType(sq));
-		for(int capture = 0; capture < 64; capture++) {
-			if(captures.test(capture)) {
-				if (getPieceType(capture) == k) return true;
+		if (!king.test(sq)) continue;
+		kingPos = sq;
+		break;
+	}
+
+	bitset<64> opponantBitboard = colourInCheck == white ? Bpieces : Wpieces;
+	//north & north-west
+	if (kingPos < 56) { // north
+		if (opponantBitboard.test(kingPos + N) && getPieceType(kingPos + N) == k)
+			return true;
+		for (int sq = kingPos + N; sq < 64; sq += N) {
+			if (!Occupied.test(sq)) continue;
+			if (!opponantBitboard.test(sq)) break;
+			if (getPieceType(sq) == r || getPieceType(sq) == q) return true;
+			break;
+		}
+		if (kingPos % 8 > 0) { // north-west
+			if (opponantBitboard.test(kingPos + NW) && getPieceType(kingPos + NW) == k)
+				return true;
+			for (int sq = kingPos + NW; sq < 64; sq += NW) {
+				if (sq % 8 > kingPos % 8) break; // left blocker
+				if (!Occupied.test(sq)) continue;
+				if (!opponantBitboard.test(sq)) break;
+				if (getPieceType(sq) == b || getPieceType(sq) == q) return true;
+				break;
 			}
 		}
 	}
+	//west & south-west
+	if (kingPos % 8 > 0) { // west
+		if (opponantBitboard.test(kingPos + W) && getPieceType(kingPos + W) == k)
+			return true;
+		for (int sq = kingPos + W; sq >= getFirstOfRank(kingPos); sq += W) {
+			if (!Occupied.test(sq)) continue;
+			if (!opponantBitboard.test(sq)) break;
+			if (getPieceType(sq) == r || getPieceType(sq) == q) return true;
+			break;
+		}
+		if (kingPos >= 8) { //south-west
+			if (opponantBitboard.test(kingPos + SW) && getPieceType(kingPos + SW) == k)
+				return true;
+			for (int sq = kingPos + SW; sq >= 0; sq += SW) {
+				if (sq % 8 > kingPos % 8) break; // left blocker
+				if (!Occupied.test(sq)) continue;
+				if (!opponantBitboard.test(sq)) break;
+				if (getPieceType(sq) == b || getPieceType(sq) == q) return true;
+				break;
+			}
+		}
+	}
+	//south & south-east
+	if (kingPos >= 8) {//south
+		if (opponantBitboard.test(kingPos + S) && getPieceType(kingPos + S) == k)
+			return true;
+		for (int sq = kingPos + S; sq >= 0; sq += S) {
+			if (!Occupied.test(sq)) continue;
+			if (!opponantBitboard.test(sq)) break;
+			if (getPieceType(sq) == r || getPieceType(sq) == q) return true;
+			break;
+		}
+		if (kingPos % 8 < 7) { //south-east
+			if (opponantBitboard.test(kingPos + SE) && getPieceType(kingPos + SE) == k)
+				return true;
+			for (int sq = kingPos + SE; sq >= 0; sq += SE) {
+				if (sq % 8 < kingPos % 8) break; // right blocker
+				if (!Occupied.test(sq)) continue;
+				if (!opponantBitboard.test(sq)) break;
+				if (getPieceType(sq) == b || getPieceType(sq) == q) return true;
+				break;
+			}
+		}
+	}
+	//east & north-east
+	if (kingPos % 8 < 7) { //east
+		if (opponantBitboard.test(kingPos + E) && getPieceType(kingPos + E) == k)
+			return true;
+		for (int sq = kingPos + E; sq <= getLastOfRank(kingPos); sq += E) {
+			if (!Occupied.test(sq)) continue;
+			if (!opponantBitboard.test(sq)) break;
+			if (getPieceType(sq) == r || getPieceType(sq) == q) return true;
+			break;
+		}
+		if (kingPos < 56) { //north-east
+			if (opponantBitboard.test(kingPos + NE) && getPieceType(kingPos + NE) == k)
+				return true;
+			for (int sq = kingPos + NE; sq < 64; sq += NE) {
+				if (sq % 8 < kingPos % 8) break; // right blocker
+				if (!Occupied.test(sq)) continue;
+				if (!opponantBitboard.test(sq)) break;
+				if (getPieceType(sq) == b || getPieceType(sq) == q) return true;
+				break;
+			}
+		}
+	}
+
+	const enum KnightDirs {
+		SoSoWe = -17, SoSoEa = -15, SoWeWe = -10, SoEaEa = -6,
+		NoWeWe = 6, NoEaEa = 10, NoNoWe = 15, NoNoEa = 17
+	};
+
+	//knight attack check
+	if (kingPos % 8 > 0) { // not on the a file | 1We
+		if (kingPos >= 17) { // not on bottom 2 rows
+			if (opponantBitboard.test(kingPos + SoSoWe)) {
+				if (getPieceType(kingPos + SoSoWe) == n) return true;
+			}
+		}
+		if (kingPos < 48) { // not on top 2 rows
+			if (opponantBitboard.test(kingPos + NoNoWe)) {
+				if (getPieceType(kingPos + NoNoWe) == n) return true;
+			}
+		}
+	}
+	if (kingPos % 8 > 1) { // not on a or b file | 2We
+		if (kingPos >= 8) { // not on bootom row
+			if (opponantBitboard.test(kingPos + SoWeWe)) {
+				if (getPieceType(kingPos + SoWeWe) == n) return true;
+			}
+		}
+		if (kingPos < 56) { // not on top row
+			if (opponantBitboard.test(kingPos + NoWeWe)) {
+				if (getPieceType(kingPos + NoWeWe) == n) return true;
+			}
+		}
+	}
+	if (kingPos % 8 < 6) { // not on the g or h file | 2Ea
+		if (kingPos >= 8) { // not on the bottom row
+			if (opponantBitboard.test(kingPos + SoEaEa)) {
+				if (getPieceType(kingPos + SoEaEa) == n) return true;
+			}
+		}
+		if (kingPos < 56) { // not on the top row
+			if (opponantBitboard.test(kingPos + NoEaEa)) {
+				if (getPieceType(kingPos + NoEaEa) == n) return true;
+			}
+		}
+	}
+	if (kingPos % 8 < 7) { // 1Ea
+		if (kingPos >= 16) { // not on the bottom 2 rows
+			if (opponantBitboard.test(kingPos + SoSoEa)) {
+				if (getPieceType(kingPos + SoSoEa) == n) return true;
+			}
+		}
+		if (kingPos < 48) { //not on the top 2 rows
+			if (opponantBitboard.test(kingPos + NoNoEa)) {
+				if (getPieceType(kingPos + NoNoEa) == n) return true;
+			}
+		}
+	}
+
+	//pawn attack check
+	if (colourInCheck == white && kingPos < 56) {
+		if (kingPos % 8 > 0) {
+			if (opponantBitboard.test(kingPos + NW)) {
+				if (getPieceType(kingPos + 7) == p) return true;
+			}
+		}
+		if (kingPos % 8 < 7) {
+			if (opponantBitboard.test(kingPos + NE)) {
+				if (getPieceType(kingPos + 9) == p) return true;
+			}
+		}
+	}
+	if (colourInCheck == black && kingPos >= 8) {
+		if (kingPos % 8 > 0) {
+			if (opponantBitboard.test(kingPos + SW)) {
+				if (getPieceType(kingPos - 9) == p) return true;
+			}
+		}
+		if (kingPos % 8 < 7) {
+			if (opponantBitboard.test(kingPos + SE)) {
+				if (getPieceType(kingPos - 7) == p) return true;
+			}
+		}
+	}
+
 	return false;
+}
+
+bool isCheckMate(Colour colourInCheck) {
+	if (!isCheck(colourInCheck)) return false;
+	
+	bitset<64> colourBB = colourInCheck == white ? Wpieces : Bpieces;
+	for (int sq = 0; sq < 64; sq++) {
+		if (!colourBB.test(sq)) continue;
+		bitset<64> attacks = getLegalMoves(static_cast<enumSquare>(sq), colourInCheck, getPieceType(sq))
+			| getLegalCaptures(static_cast<enumSquare>(sq), colourInCheck, getPieceType(sq));
+
+		if (attacks.count() != 0) return false;
+	}
+	return true;
 }
 
 //takes in a FEN string and updates the bitboards

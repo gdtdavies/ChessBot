@@ -135,6 +135,7 @@
     <ClInclude Include="LookupBitBoards\knight.h" />
     <ClInclude Include="LookupBitBoards\pawn.h" />
     <ClInclude Include="LookupBitBoards\slidingPieces.h" />
+    <ClInclude Include="Move.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
