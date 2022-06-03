@@ -61,6 +61,7 @@ void drawSelected(int rank, int file);
 void drawAttacks(enumSquare sq);
 
 bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t);
+bitset<64> getLegalCaptures(enumSquare sq, Colour c, Type t);
 
 Colour getPieceColour(int pos);
 Type getPieceType(int pos);
@@ -177,8 +178,13 @@ void mouseCallback(int button, int state, int x, int y) {
 
 				Colour originColour = getPieceColour(originSq);
 				Type originType = getPieceType(originSq);
+
+				bitset<64> moves = getLegalMoves(originSq, originColour, originType);
+				bitset<64> captures = getLegalCaptures(originSq, originColour, originType);
 				
-				if (!getLegalMoves(originSq, originColour, originType).test(targetSq)) return;
+				if (!(moves|captures).test(targetSq)) return;
+
+				if (captures.test(targetSq)) nbPiecesOnBoard--;
 				
 				if (originColour == white) {
 					Bp.set(targetSq, 0); Bn.set(targetSq, 0); Bb.set(targetSq, 0); 
@@ -256,9 +262,6 @@ void mouseCallback(int button, int state, int x, int y) {
 				Occupied = Wpieces | Bpieces;
 
 				originSq = null;
-				cout << "move to square " << targetSq << endl;
-				cout << Wq.to_string() << endl;
-
 				turn == white ? turn = black : turn = white;
 								
 			}
@@ -364,9 +367,10 @@ void drawSelected(int rank, int file) {
 }
 
 void drawAttacks(enumSquare sq) {
-	bitset<64> attacks = getLegalMoves(sq, getPieceColour(sq), getPieceType(sq));
+	bitset<64> moves = getLegalMoves(sq, getPieceColour(sq), getPieceType(sq));
+	bitset<64> captures = getLegalCaptures(sq, getPieceColour(sq), getPieceType(sq));
 	for (int i = 0; i < 64; i++) {
-		if (!attacks.test(i)) continue;
+		if (!(moves|captures).test(i)) continue;
 		int rank = i / 8;
 		int file = i % 8;
 
@@ -377,7 +381,7 @@ void drawAttacks(enumSquare sq) {
 		double cy = rank * sqH / double(screenHeight) - 0.762;
 		
 		glBegin(GL_LINE_LOOP);
-		glColor3f(0.35, 0.35, 0.35);
+		moves.test(i) ? glColor3f(0.0f, 1.0f, 0.0f) : glColor3f(1.0f, 0.0f, 0.0f);
 		for (int j = 0; j < 20; j++) {
 			float theta = 2.0f * 3.1415926f * float(j) / float(20);//get the current angle 
 			float x = w/2 * cosf(theta);//calculate the x component 
@@ -411,37 +415,74 @@ Colour getPieceColour(int square) {
 //================||==================||==================||==================||==================>>
 
 bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t) {
-	bitset<64> attacks(0);
+	bitset<64> moves(0);
 	switch (t) {
 	case p:
 		if (c == white) {
-			attacks.set(sq + 8, 1);
+			moves.set(sq + 8, 1);
 			if(sq < 16 && !Occupied.test(sq+8))
-				attacks.set(sq + 16, 1);
+				moves.set(sq + 16, 1);
 		}
 		else {
-			attacks.set(sq - 8, 1);
+			moves.set(sq - 8, 1);
 			if (sq >= 48 && !Occupied.test(sq - 8))
-				attacks.set(sq - 16, 1);
+				moves.set(sq - 16, 1);
 		}
 		break;
 	case n:
-		attacks = nA.getKnightAttacks(sq) & ~Occupied;
+		moves = nA.getKnightAttacks(sq) & ~Occupied;
 		break;
 	case b:
-		attacks = sA.getBishopAttacks(Occupied, sq) & ~Occupied;
+		moves = sA.getBishopAttacks(Occupied, sq) & ~Occupied;
 		break;
 	case r:
-		attacks = sA.getRookAttacks(Occupied, sq) & ~Occupied;
+		moves = sA.getRookAttacks(Occupied, sq) & ~Occupied;
 		break;
 	case q:
-		attacks = sA.getQueenAttacks(Occupied, sq) & ~Occupied;
+		moves = sA.getQueenAttacks(Occupied, sq) & ~Occupied;
 		break;
 	case k:
-		attacks = kA.getKingAttacks(sq) & ~Occupied;
+		moves = kA.getKingAttacks(sq) & ~Occupied;
 		break;
 	}
-	return attacks;
+	return moves;
+}
+
+bitset<64> getLegalCaptures(enumSquare sq, Colour c, Type t) {
+	bitset<64> captures(0);
+	bitset<64> opponentBB = c == white ? Bpieces : Wpieces;
+	switch (t) {
+	case p:
+		if (c == white) {
+			if(sq % 8 > 0 && opponentBB.test(sq + 7))
+				captures.set(sq + 7, 1);
+			if (sq % 8 < 7 && opponentBB.test(sq + 9))
+				captures.set(sq + 9, 1);
+		}
+		else {
+			if (sq % 8 > 0 && opponentBB.test(sq - 9))
+				captures.set(sq - 9, 1);
+			if (sq % 8 < 7 && opponentBB.test(sq - 7))
+				captures.set(sq - 7, 1);
+		}
+		break;
+	case n:
+		captures = nA.getKnightAttacks(sq) & opponentBB;
+		break;
+	case b:
+		captures = sA.getBishopAttacks(Occupied, sq) & opponentBB;
+		break;
+	case r:
+		captures = sA.getRookAttacks(Occupied, sq) & opponentBB;
+		break;
+	case q:
+		captures = sA.getQueenAttacks(Occupied, sq) & opponentBB;
+		break;
+	case k:
+		captures = kA.getKingAttacks(sq) & opponentBB;
+		break;
+	}
+	return captures;
 }
 
 //takes in a FEN string and updates the bitboards
