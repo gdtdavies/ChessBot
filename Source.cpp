@@ -57,7 +57,7 @@ kingAttacks kA;
 
 vector<Move> movesMade;
 
-bitset<64> attacksToDisplay(0);
+bitset<64> currentAttacks(0);
 
 bool Checkmate = false;
 bool Check = false;
@@ -104,7 +104,7 @@ void display() {
 
 	if (originSq != null) {
 		drawSelected(originSq / 8, originSq % 8);
-		drawAttacks(attacksToDisplay);
+		drawAttacks(currentAttacks);
 	}
 	
 	if (Checkmate)
@@ -179,7 +179,7 @@ void mouseCallback(int button, int state, int x, int y) {
 				if(Wpieces.test(sq) && turn == white || Bpieces.test(sq) && turn == black) {
 					if (originSq != static_cast<enumSquare>(sq)) {
 						originSq = static_cast<enumSquare>(sq);
-						attacksToDisplay = getAttacks(originSq);
+						currentAttacks = getAttacks(originSq);
 					}
 					else 
 						originSq = null;
@@ -197,12 +197,10 @@ void mouseCallback(int button, int state, int x, int y) {
 				Colour originColour = getPieceColour(originSq);
 				Type originType = getPieceType(originSq);
 
-				bitset<64> moves = getLegalMoves(originSq, originColour, originType);
-				bitset<64> captures = getLegalCaptures(originSq, originColour, originType);
+				//bitset<64> moves = getLegalMoves(originSq, originColour, originType);
+				//bitset<64> captures = getLegalCaptures(originSq, originColour, originType);
 				
-				if (!(moves|captures).test(targetSq)) return;
-
-				if (captures.test(targetSq)) nbPiecesOnBoard--;
+				if (!currentAttacks.test(targetSq)) return;
 				
 				makeMove(originSq, targetSq, originColour, originType);
 
@@ -417,10 +415,31 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 		if (c == white) {
 			Wk.set(origin, 0);
 			Wk.set(target, 1);
+			if (origin - target == 2) {
+				Wr.set(0, 0);
+				Wr.set(3, 1);
+				m.isCastle = true;
+			}
+			else if (target - origin == 2) {
+				Wr.set(7, 0);
+				Wr.set(5, 1);
+				m.isCastle = true;
+			}
+
 		}
 		else {
 			Bk.set(origin, 0);
 			Bk.set(target, 1);
+			if (origin - target == 2) {
+				Br.set(56, 0);
+				Br.set(59, 1);
+				m.isCastle = true;
+			}
+			else if (target - origin == 2) {
+				Br.set(61, 1);
+				Br.set(63, 0);
+				m.isCastle = true;
+			}
 		}
 		break;
 	}
@@ -480,7 +499,24 @@ void unmakeMove() {
 
 		nbPiecesOnBoard++;
 	}
-	//TODO: undo castle
+	else if (move.isCastle) {
+		if (move.getDestination() == 2) { //white queen side castle
+			Wr.set(3, 0);
+			Wr.set(0, 1);
+		}
+		else if (move.getDestination() == 6) { //white king side castle
+			Wr.set(5, 0);
+			Wr.set(7, 1);
+		}
+		else if (move.getDestination() == 58) { //black queen side castle
+			Br.set(59, 0);
+			Br.set(56, 1);
+		}
+		else if (move.getDestination() == 62) { //black king side castle
+			Br.set(61, 0);
+			Br.set(63, 1);
+		}
+	}
 
 
 	//if it was a diagonal pawn move but wasn't a take, then it was an en passent
@@ -519,12 +555,12 @@ Colour getPieceColour(int square) {
 	return NA;
 }
 
-int getFirstOfRank(int square) {
-	return square - square % 8;
+int getFirstOfRank(int sq) {
+	return sq - sq % 8;
 }
 
-int getLastOfRank(int square) {
-	return square + 7 - square % 8;
+int getLastOfRank(int sq) {
+	return sq + 7 - sq % 8;
 }
 
 //================||==================||==================||==================||==================>>
@@ -570,6 +606,48 @@ bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t) {
 		break;
 	case k:
 		mask = kA.getKingAttacks(sq) & ~Occupied;
+		if (sq == 4) {
+			for (int i = 0; i < 2; i++) {
+				int negative = i % 2 == 0 ? 1 : -1;
+				if (castlingRights.test(i)) {
+					if (!Occupied.test(sq + negative) && !Occupied.test(sq + negative * 2)) {
+						if (!isCheck(c)) {
+							makeMove(sq, static_cast<enumSquare>(sq + negative), c, t);
+							if (!isCheck(c)) {
+								unmakeMove();
+								makeMove(sq, static_cast<enumSquare>(sq + negative * 2), c, t);
+								if (!isCheck(c)) {
+									if (negative == 1 || !Occupied.test(sq - 3))
+										moves.set(sq + negative * 2);
+								}
+							}
+							unmakeMove();
+						}
+					}
+				}
+			}
+		}
+		if (sq == 60) {
+			for (int i = 2; i < 4; i++) {
+				if (castlingRights.test(i)) {
+					int negative = i % 2 == 0 ? 1 : -1;
+					if (!Occupied.test(sq + negative) && !Occupied.test(sq + negative * 2)) {
+						if (!isCheck(c)) {
+							makeMove(sq, static_cast<enumSquare>(sq + negative), c, t);
+							if (!isCheck(c)) {
+								unmakeMove();
+								makeMove(sq, static_cast<enumSquare>(sq + negative * 2), c, t);
+								if (!isCheck(c)) {
+									if (negative == 1 || !Occupied.test(sq - 3))
+										moves.set(sq + negative * 2);
+								}
+							}
+							unmakeMove();
+						}
+					}
+				}
+			}
+		}
 		break;
 	}
 	if (t == p) return moves;

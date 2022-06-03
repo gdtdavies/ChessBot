@@ -19,6 +19,7 @@ public:
 	void setTakenType(Type tt);
 
 	bool isTake();	
+	bool isCastle = false;
 };
 
 Move::Move() {}
