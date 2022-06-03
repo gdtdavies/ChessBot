@@ -60,7 +60,7 @@ vector<Move> movesMade;
 bitset<64> currentAttacks(0);
 
 bool Checkmate = false;
-bool Check = false;
+bool Wcheck = false, Bcheck = false;
 
 //-------------------------------------------------------------------------------------------------
 void mouseCallback(int button, int state, int x, int y);
@@ -196,19 +196,15 @@ void mouseCallback(int button, int state, int x, int y) {
 
 				Colour originColour = getPieceColour(originSq);
 				Type originType = getPieceType(originSq);
-
-				//bitset<64> moves = getLegalMoves(originSq, originColour, originType);
-				//bitset<64> captures = getLegalCaptures(originSq, originColour, originType);
 				
 				if (!currentAttacks.test(targetSq)) return;
 				
 				makeMove(originSq, targetSq, originColour, originType);
 
+				Wcheck = isCheck(white); Bcheck = isCheck(black);
 				Checkmate = isCheckMate(turn);
 
 				originSq = null;
-
-				cout << castlingRights.to_string() << endl;
 
 			}
 		}
@@ -223,9 +219,8 @@ void mouseCallback(int button, int state, int x, int y) {
 void drawLine(float x1, float y1, float x2, float y2, Colour c) {
 	glBegin(GL_LINES);
 	
-	c == white ?
-		glColor3f(1.0, 1.0, 1.0) :
-		glColor3f(0.0, 0.0, 0.0);
+	c == white ? glColor3f(1.0, 1.0, 1.0) :
+	c == black ? glColor3f(0.0, 0.0, 0.0) : glColor3f(0.75, 0.0, 0.0);
 	glVertex2f(x1, y1);
 	glVertex2f(x2, y2);
 	glEnd();
@@ -268,6 +263,7 @@ void drawPiece(int rank, int file, Colour c, Type t) {
 		drawLine(x, y - h / 2., x, y + h / 2., c);
 		break;
 	case k:
+		if (Wcheck && c == white || Bcheck && c == black) c = NA;
 		drawLine(x - w / 2, y - h / 2, x + w / 2, y - h / 2, c);
 		drawLine(x + w / 2, y - h / 2, x + w / 2, y + h / 2, c);
 		drawLine(x + w / 2, y + h / 2, x - w / 2, y + h / 2, c);
