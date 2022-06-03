@@ -1,6 +1,3 @@
-#pragma once
-#include <bitset>
-
 using namespace std;
 
 bitset<64> Wp(0), Bp(0);

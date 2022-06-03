@@ -1,5 +1,6 @@
 #include<iostream>
 #include<string>
+#include<bitset>
 
 //--- OpenGL ---
 #include "GL\glew.h"
@@ -13,6 +14,7 @@
 #include "GL\freeglut.h"
 
 #include "Bitboards.h"
+
 
 const enum Colour { white, black, NA };
 const enum Type {p, r, n, b, q, k, None};
@@ -28,6 +30,10 @@ const enum enumSquare : int {
 	a8, b8, c8, d8, e8, f8, g8, h8, null
 };
 
+#include "LookupBitBoards/pawn.h"
+#include "LookupBitBoards/knight.h"
+#include "LookupBitBoards/king.h"
+#include "LookupBitBoards/slidingPieces.h"
 
 int screenWidth = 900, screenHeight = 900;
 int sqW, sqH;
@@ -35,13 +41,16 @@ glm::mat4 ViewMatrix;					// matrix for the modelling and viewing
 glm::mat4 ProjectionMatrix;			// matrix for the orthographic projection
 
 int nbPiecesOnBoard = 0;
-Colour turn = white;
+Colour turn;
 
 int HMcounter = 0, FMcounter = 0;
 
-int selectedSq = 64;
 enumSquare originSq = null;
 
+pawnAttacks pA;
+knightAttacks nA;
+slidingAttacks sA;
+kingAttacks kA;
 
 
 //-------------------------------------------------------------------------------------------------
@@ -50,6 +59,8 @@ void drawPiece(int x, int y, Colour c, Type t);
 void drawBoard();
 void drawSelected(int rank, int file);
 
+Colour getPieceColour(int pos);
+Type getPieceType(int pos);
 
 //=================================<<--------------------------->>================================//
 //=================================<< START OF OPENGL FUNCTIONS >>================================//
@@ -73,9 +84,8 @@ void display() {
 
 	drawBoard();
 
-	if (selectedSq < 64) {
-		drawSelected(selectedSq / 8, selectedSq % 8);
-	}
+	if (originSq != null) 
+		drawSelected(originSq / 8, originSq % 8);
 
 	for (int sq = 0; sq < 64; sq++) {
 		if (!Occupied.test(sq)) continue;
@@ -142,8 +152,108 @@ void mouseCallback(int button, int state, int x, int y) {
 		int squareY = (sq / 8) * height + height / 2;
 		if (squareX - width / 2 < x && x < squareX + width / 2) {
 			if (squareY - height / 2 < y && y < squareY + height / 2) {
-				selectedSq = sq;
-				return;
+				if(Wpieces.test(sq) && turn == white || Bpieces.test(sq) && turn == black) {
+					if (originSq != static_cast<enumSquare>(sq)) 
+						originSq = static_cast<enumSquare>(sq);
+					else 
+						originSq = null;
+					return;
+				}
+
+				if (originSq == null) return;
+				bitset<64> attackerBB = turn == white ? Wpieces : Bpieces;
+				if (attackerBB.test(sq)) return;
+				
+				int rank = originSq / 8;
+				int file = originSq % 8;
+
+				enumSquare targetSq = static_cast<enumSquare>(sq);
+				Colour targetColour = getPieceColour(targetSq);
+
+				Colour originColour = getPieceColour(originSq);
+				Type originType = getPieceType(originSq);
+
+				if (originColour == white) {
+					Bp.set(targetSq, 0); Bn.set(targetSq, 0); Bb.set(targetSq, 0); 
+					Br.set(targetSq, 0); Bq.set(targetSq, 0); Bk.set(targetSq, 0);
+				}
+				else {
+					Wp.set(targetSq, 0); Wn.set(targetSq, 0); Wb.set(targetSq, 0); 
+					Wr.set(targetSq, 0); Wq.set(targetSq, 0); Wk.set(targetSq, 0);
+				}
+
+				switch (originType) {
+				case p:
+					if (originColour == white) {
+						Wp.set(originSq, 0);
+						Wp.set(targetSq, 1);
+					}
+					else {
+						Bp.set(originSq, 0);
+						Bp.set(targetSq, 1);
+					}
+					break;
+				case n:
+					if (originColour == white) {
+						Wn.set(originSq, 0);
+						Wn.set(targetSq, 1);
+					}
+					else {
+						Bn.set(originSq, 0);
+						Bn.set(targetSq, 1);
+					}
+					break;
+				case b:
+					if (originColour == white) {
+						Wb.set(originSq, 0);
+						Wb.set(targetSq, 1);
+					}
+					else {
+						Bb.set(originSq, 0);
+						Bb.set(targetSq, 1);
+					}
+					break;
+				case r:
+					if (originColour == white) {
+						Wr.set(originSq, 0);
+						Wr.set(targetSq, 1);
+					}
+					else {
+						Br.set(originSq, 0);
+						Br.set(targetSq, 1);
+					}
+					break;
+				case q:
+					if (originColour == white) {
+						Wq.set(originSq, 0);
+						Wq.set(targetSq, 1);
+					}
+					else {
+						Bq.set(originSq, 0);
+						Bq.set(targetSq, 1);
+					}
+					break;
+				case k:
+					if (originColour == white) {
+						Wk.set(originSq, 0);
+						Wk.set(targetSq, 1);
+					}
+					else {
+						Bk.set(originSq, 0);
+						Bk.set(targetSq, 1);
+					}
+					break;
+				}
+				Wpieces = Wp | Wn | Wb | Wr | Wq | Wk;
+				Bpieces = Bp | Bn | Bb | Br | Bq | Bk;
+				Occupied = Wpieces | Bpieces;
+
+				originSq = null;
+				cout << "move to square " << targetSq << endl;
+				cout << Wq.to_string() << endl;
+
+				turn == white ? turn = black : turn = white;
+								
 			}
 		}
 	}
@@ -166,11 +276,11 @@ void drawLine(float x1, float y1, float x2, float y2, Colour c) {
 }
 
 void drawPiece(int rank, int file, Colour c, Type t) {
-	double w = (sqW * 0.5) / double(screenWidth);
-	double h = (sqH * 0.5) / double(screenHeight);
+	float w = (sqW * 0.5) / double(screenWidth);
+	float h = (sqH * 0.5) / double(screenHeight);
 
-	double x = file * sqW / double(screenWidth) - 0.762;
-	double y = rank * sqH / double(screenHeight) - 0.762;
+	float x = file * sqW / double(screenWidth) - 0.762;
+	float y = rank * sqH / double(screenHeight) - 0.762;
 	float ratio = 0.85;
 	switch (t) {
 	case p:
@@ -195,7 +305,6 @@ void drawPiece(int rank, int file, Colour c, Type t) {
 		drawLine(x, y - h / 2., x, y + h / 2., c);
 		break;
 	case q:
-		
 		drawLine(x - w / 2. * ratio, y + h / 2. * ratio, x + w / 2. * ratio, y - h / 2. * ratio, c);
 		drawLine(x - w / 2. * ratio, y - h / 2. * ratio, x + w / 2. * ratio, y + h / 2. * ratio, c);
 
@@ -245,6 +354,62 @@ void drawSelected(int rank, int file) {
 	glVertex2d(x + w / 2., y + h / 2.);
 	glVertex2d(x + w / 2., y - h / 2.);
 	glEnd();
+}
+
+//================||==================||==================||==================||==================>>
+
+//returns the type of the piece in the entered square
+Type getPieceType(int square) {
+	if (Wp.test(square) || Bp.test(square)) return p;
+	if (Wr.test(square) || Br.test(square)) return r;
+	if (Wn.test(square) || Bn.test(square)) return n;
+	if (Wb.test(square) || Bb.test(square)) return b;
+	if (Wq.test(square) || Bq.test(square)) return q;
+	if (Wk.test(square) || Bk.test(square)) return k;
+	return None;
+}
+
+//returns the colour of the piece in the entered square
+Colour getPieceColour(int square) {
+	if (Wpieces.test(square)) return white;
+	if (Bpieces.test(square)) return black;
+	return NA;
+}
+
+//================||==================||==================||==================||==================>>
+
+bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t) {
+	bitset<64> attacks(0);
+	switch (t) {
+	case p:
+		if (c == white) {
+			attacks.set(sq + 8, 1);
+			if(sq < 16 && !Occupied.test(sq+8))
+				attacks.set(sq + 16, 1);
+		}
+		else {
+			attacks.set(sq - 8, 1);
+			if (sq < 16 && !Occupied.test(sq - 8))
+				attacks.set(sq - 16, 1);
+		}
+		break;
+	case n:
+		attacks = nA.getKnightAttacks(sq) & ~Occupied;
+		break;
+	case b:
+		attacks = sA.getBishopAttacks(Occupied, sq) & ~Occupied;
+		break;
+	case r:
+		attacks = sA.getRookAttacks(Occupied, sq) & ~Occupied;
+		break;
+	case q:
+		attacks = sA.getQueenAttacks(Occupied, sq) & ~Occupied;
+		break;
+	case k:
+		attacks = kA.getKingAttacks(sq) & ~Occupied;
+		break;
+	}
+	return attacks;
 }
 
 //takes in a FEN string and updates the bitboards
@@ -367,18 +532,17 @@ int main(int argc, char** argv) {
 		std::cout << " GLEW ERROR" << std::endl;
 
 	//loadFromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ");
-	
 	loadFromFen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 ");
-	
-	//loadFromFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1 ");
-	
+	//loadFromFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1 ");	
 	//loadFromFen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1 ");
 	//loadFromFen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1 ");
-
 	//loadFromFen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8 ");
-	
 	//loadFromFen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ");
 
+	pA.setPawnAttacks();
+	nA.setKnightAttacks();
+	sA.setRayAttacks();
+	kA.setKingAttacks();
 	
 	init();
 	glutDisplayFunc(display);

@@ -131,6 +131,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Bitboards.h" />
+    <ClInclude Include="LookupBitBoards\king.h" />
+    <ClInclude Include="LookupBitBoards\knight.h" />
+    <ClInclude Include="LookupBitBoards\pawn.h" />
+    <ClInclude Include="LookupBitBoards\slidingPieces.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
