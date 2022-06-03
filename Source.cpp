@@ -208,6 +208,8 @@ void mouseCallback(int button, int state, int x, int y) {
 
 				originSq = null;
 
+				cout << castlingRights.to_string() << endl;
+
 			}
 		}
 	}
@@ -350,6 +352,8 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 	Type tt = getPieceType(target);
 	if (tt != None)
 		m.setTakenType(tt);
+
+	pCastlingRights = castlingRights;
 	
 	if (c == white) {
 		Bp.set(target, 0); Bn.set(target, 0); Bb.set(target, 0);
@@ -395,10 +399,14 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 		if (c == white) {
 			Wr.set(origin, 0);
 			Wr.set(target, 1);
+			if (origin == 0) castlingRights.set(1, 0);
+			if (origin == 7) castlingRights.set(0, 0);
 		}
 		else {
 			Br.set(origin, 0);
 			Br.set(target, 1);
+			if (origin == 56) castlingRights.set(3, 0);
+			if (origin == 63) castlingRights.set(2, 0);
 		}
 		break;
 	case q:
@@ -425,7 +433,8 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 				Wr.set(5, 1);
 				m.isCastle = true;
 			}
-
+			castlingRights.set(0, 0);
+			castlingRights.set(1, 0);
 		}
 		else {
 			Bk.set(origin, 0);
@@ -440,6 +449,8 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 				Br.set(63, 0);
 				m.isCastle = true;
 			}
+			castlingRights.set(2, 0);
+			castlingRights.set(3, 0);
 		}
 		break;
 	}
@@ -447,9 +458,7 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 	Bpieces = Bp | Bn | Bb | Br | Bq | Bk;
 	Occupied = Wpieces | Bpieces;
 
-	cout << "turn before = " << turn << endl;
 	turn = turn == white ? black : white;
-	cout << "turn after = " << turn << endl;
 
 	movesMade.push_back(m);
 }
@@ -459,6 +468,7 @@ void unmakeMove() {
 	if (movesMade.empty()) return;
 	Move move = movesMade.back();
 
+	castlingRights = pCastlingRights;
 
 	//set the destination to 0 in all the bitboards
 	Wp.set(move.getDestination(), 0); Bp.set(move.getDestination(), 0);
