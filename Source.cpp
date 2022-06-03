@@ -58,6 +58,7 @@ void mouseCallback(int button, int state, int x, int y);
 void drawPiece(int x, int y, Colour c, Type t);
 void drawBoard();
 void drawSelected(int rank, int file);
+void drawAttacks(enumSquare sq);
 
 bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t);
 
@@ -86,8 +87,10 @@ void display() {
 
 	drawBoard();
 
-	if (originSq != null) 
+	if (originSq != null) {
 		drawSelected(originSq / 8, originSq % 8);
+		drawAttacks(originSq);
+	}
 
 	for (int sq = 0; sq < 64; sq++) {
 		if (!Occupied.test(sq)) continue;
@@ -174,7 +177,9 @@ void mouseCallback(int button, int state, int x, int y) {
 
 				Colour originColour = getPieceColour(originSq);
 				Type originType = getPieceType(originSq);
-
+				
+				if (!getLegalMoves(originSq, originColour, originType).test(targetSq)) return;
+				
 				if (originColour == white) {
 					Bp.set(targetSq, 0); Bn.set(targetSq, 0); Bb.set(targetSq, 0); 
 					Br.set(targetSq, 0); Bq.set(targetSq, 0); Bk.set(targetSq, 0);
@@ -183,7 +188,7 @@ void mouseCallback(int button, int state, int x, int y) {
 					Wp.set(targetSq, 0); Wn.set(targetSq, 0); Wb.set(targetSq, 0); 
 					Wr.set(targetSq, 0); Wq.set(targetSq, 0); Wk.set(targetSq, 0);
 				}
-				if (!getLegalMoves(originSq, originColour, originType).test(targetSq)) return;
+				
 				switch (originType) {
 				case p:
 					if (originColour == white) {	
@@ -356,6 +361,31 @@ void drawSelected(int rank, int file) {
 	glVertex2d(x + w / 2., y + h / 2.);
 	glVertex2d(x + w / 2., y - h / 2.);
 	glEnd();
+}
+
+void drawAttacks(enumSquare sq) {
+	bitset<64> attacks = getLegalMoves(sq, getPieceColour(sq), getPieceType(sq));
+	for (int i = 0; i < 64; i++) {
+		if (!attacks.test(i)) continue;
+		int rank = i / 8;
+		int file = i % 8;
+
+		float w = (sqW/2) / double(screenWidth);
+		float h = (sqH/2) / double(screenHeight);
+
+		double cx = file * sqW / double(screenWidth) - 0.762;
+		double cy = rank * sqH / double(screenHeight) - 0.762;
+		
+		glBegin(GL_LINE_LOOP);
+		glColor3f(0.35, 0.35, 0.35);
+		for (int j = 0; j < 20; j++) {
+			float theta = 2.0f * 3.1415926f * float(j) / float(20);//get the current angle 
+			float x = w/2 * cosf(theta);//calculate the x component 
+			float y = h/2 * sinf(theta);//calculate the y component 
+			glVertex2f(x + cx, y + cy);//output vertex 
+		}
+		glEnd();
+	}
 }
 
 //================||==================||==================||==================||==================>>
