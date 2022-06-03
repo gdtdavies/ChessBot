@@ -60,6 +60,7 @@ void drawBoard();
 void drawSelected(int rank, int file);
 void drawAttacks(enumSquare sq);
 
+void makeMove(enumSquare origin, enumSquare target, Colour c, Type t);
 bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t);
 bitset<64> getLegalCaptures(enumSquare sq, Colour c, Type t);
 
@@ -167,8 +168,6 @@ void mouseCallback(int button, int state, int x, int y) {
 				}
 
 				if (originSq == null) return;
-				bitset<64> attackerBB = turn == white ? Wpieces : Bpieces;
-				if (attackerBB.test(sq)) return;
 				
 				int rank = originSq / 8;
 				int file = originSq % 8;
@@ -186,80 +185,7 @@ void mouseCallback(int button, int state, int x, int y) {
 
 				if (captures.test(targetSq)) nbPiecesOnBoard--;
 				
-				if (originColour == white) {
-					Bp.set(targetSq, 0); Bn.set(targetSq, 0); Bb.set(targetSq, 0); 
-					Br.set(targetSq, 0); Bq.set(targetSq, 0); Bk.set(targetSq, 0);
-				}
-				else {
-					Wp.set(targetSq, 0); Wn.set(targetSq, 0); Wb.set(targetSq, 0); 
-					Wr.set(targetSq, 0); Wq.set(targetSq, 0); Wk.set(targetSq, 0);
-				}
-				
-				switch (originType) {
-				case p:
-					if (originColour == white) {	
-						Wp.set(originSq, 0);
-						Wp.set(targetSq, 1);
-					}
-					else {
-						Bp.set(originSq, 0);
-						Bp.set(targetSq, 1);
-					}
-					break;
-				case n:
-					if (originColour == white) {
-						Wn.set(originSq, 0);
-						Wn.set(targetSq, 1);
-					}
-					else {
-						Bn.set(originSq, 0);
-						Bn.set(targetSq, 1);
-					}
-					break;
-				case b:
-					if (originColour == white) {
-						Wb.set(originSq, 0);
-						Wb.set(targetSq, 1);
-					}
-					else {
-						Bb.set(originSq, 0);
-						Bb.set(targetSq, 1);
-					}
-					break;
-				case r:
-					if (originColour == white) {
-						Wr.set(originSq, 0);
-						Wr.set(targetSq, 1);
-					}
-					else {
-						Br.set(originSq, 0);
-						Br.set(targetSq, 1);
-					}
-					break;
-				case q:
-					if (originColour == white) {
-						Wq.set(originSq, 0);
-						Wq.set(targetSq, 1);
-					}
-					else {
-						Bq.set(originSq, 0);
-						Bq.set(targetSq, 1);
-					}
-					break;
-				case k:
-					if (originColour == white) {
-						Wk.set(originSq, 0);
-						Wk.set(targetSq, 1);
-					}
-					else {
-						Bk.set(originSq, 0);
-						Bk.set(targetSq, 1);
-					}
-					break;
-				}
-				Wpieces = Wp | Wn | Wb | Wr | Wq | Wk;
-				Bpieces = Bp | Bn | Bb | Br | Bq | Bk;
-				Occupied = Wpieces | Bpieces;
+				makeMove(originSq, targetSq, originColour, originType);
 
 				originSq = null;
 				turn == white ? turn = black : turn = white;
@@ -393,6 +319,83 @@ void drawAttacks(enumSquare sq) {
 }
 
 //================||==================||==================||==================||==================>>
+
+void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
+	if (c == white) {
+		Bp.set(target, 0); Bn.set(target, 0); Bb.set(target, 0);
+		Br.set(target, 0); Bq.set(target, 0); Bk.set(target, 0);
+	}
+	else {
+		Wp.set(target, 0); Wn.set(target, 0); Wb.set(target, 0);
+		Wr.set(target, 0); Wq.set(target, 0); Wk.set(target, 0);
+	}
+
+	switch (t) {
+	case p:
+		if (c == white) {
+			Wp.set(origin, 0);
+			Wp.set(target, 1);
+		}
+		else {
+			Bp.set(origin, 0);
+			Bp.set(target, 1);
+		}
+		break;
+	case n:
+		if (c == white) {
+			Wn.set(origin, 0);
+			Wn.set(target, 1);
+		}
+		else {
+			Bn.set(origin, 0);
+			Bn.set(target, 1);
+		}
+		break;
+	case b:
+		if (c == white) {
+			Wb.set(origin, 0);
+			Wb.set(target, 1);
+		}
+		else {
+			Bb.set(origin, 0);
+			Bb.set(target, 1);
+		}
+		break;
+	case r:
+		if (c == white) {
+			Wr.set(origin, 0);
+			Wr.set(target, 1);
+		}
+		else {
+			Br.set(origin, 0);
+			Br.set(target, 1);
+		}
+		break;
+	case q:
+		if (c == white) {
+			Wq.set(origin, 0);
+			Wq.set(target, 1);
+		}
+		else {
+			Bq.set(origin, 0);
+			Bq.set(target, 1);
+		}
+		break;
+	case k:
+		if (c == white) {
+			Wk.set(origin, 0);
+			Wk.set(target, 1);
+		}
+		else {
+			Bk.set(origin, 0);
+			Bk.set(target, 1);
+		}
+		break;
+	}
+	Wpieces = Wp | Wn | Wb | Wr | Wq | Wk;
+	Bpieces = Bp | Bn | Bb | Br | Bq | Bk;
+	Occupied = Wpieces | Bpieces;
+}
 
 //returns the type of the piece in the entered square
 Type getPieceType(int square) {
