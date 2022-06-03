@@ -64,6 +64,8 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t);
 bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t);
 bitset<64> getLegalCaptures(enumSquare sq, Colour c, Type t);
 
+bool isCheck(Colour colourInCheck);
+
 Colour getPieceColour(int pos);
 Type getPieceType(int pos);
 
@@ -93,6 +95,11 @@ void display() {
 		drawSelected(originSq / 8, originSq % 8);
 		drawAttacks(originSq);
 	}
+	
+	if (isCheck(white)) 
+		cout << "white is in check" << endl;
+	if (isCheck(black))
+		cout << "black is in check" << endl;
 
 	for (int sq = 0; sq < 64; sq++) {
 		if (!Occupied.test(sq)) continue;
@@ -486,6 +493,23 @@ bitset<64> getLegalCaptures(enumSquare sq, Colour c, Type t) {
 		break;
 	}
 	return captures;
+}
+
+//================||==================||==================||==================||==================>>
+
+bool isCheck(Colour colourInCheck) {
+	bitset<64> opponentBB = colourInCheck == white ? Bpieces : Wpieces;
+	Colour opponentColour = colourInCheck == white ? black : white;
+	for (int sq = 0; sq < 64; sq++) {
+		if (!opponentBB.test(sq)) continue;
+		bitset<64> captures = getLegalCaptures(static_cast<enumSquare>(sq), opponentColour, getPieceType(sq));
+		for(int capture = 0; capture < 64; capture++) {
+			if(captures.test(capture)) {
+				if (getPieceType(capture) == k) return true;
+			}
+		}
+	}
+	return false;
 }
 
 //takes in a FEN string and updates the bitboards
