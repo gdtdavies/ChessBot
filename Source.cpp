@@ -206,6 +206,7 @@ void mouseCallback(int button, int state, int x, int y) {
 
 				originSq = null;
 
+				cout << EPTargets.to_string() << endl;
 			}
 		}
 	}
@@ -350,99 +351,103 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 		m.setTakenType(tt);
 
 	pCastlingRights = castlingRights;
+	pEPTargets = EPTargets;
 	
-	if (c == white) {
-		Bp.set(target, 0); Bn.set(target, 0); Bb.set(target, 0);
-		Br.set(target, 0); Bq.set(target, 0); Bk.set(target, 0);
-	}
-	else {
-		Wp.set(target, 0); Wn.set(target, 0); Wb.set(target, 0);
-		Wr.set(target, 0); Wq.set(target, 0); Wk.set(target, 0);
-	}
+
+	//empty the square to be taken in all bitboards
+	Bp.set(target, 0); Bn.set(target, 0); Bb.set(target, 0);
+	Br.set(target, 0); Bq.set(target, 0); Bk.set(target, 0);
+
+	Wp.set(target, 0); Wn.set(target, 0); Wb.set(target, 0);
+	Wr.set(target, 0); Wq.set(target, 0); Wk.set(target, 0);
 
 	switch (t) {
 	case p:
 		if (c == white) {
-			Wp.set(origin, 0);
-			Wp.set(target, 1);
+			Wp.set(origin, 0); Wp.set(target, 1);
+			//find out if the move was an en passent
+			if (EPTargets.test(target)) {
+				Bp.set(target - 8, 0);
+				m.isEP = true;
+			}
+			EPTargets.reset();
+			//if the move is a two square move, set the en passent target
+			if (target - origin == 16)
+				EPTargets.set(origin + 8, 1);
 		}
 		else {
-			Bp.set(origin, 0);
-			Bp.set(target, 1);
+			Bp.set(origin, 0); Bp.set(target, 1);
+			//find out if the move was an en passent
+			if (EPTargets.test(target)) {
+				Wp.set(target + 8, 0);
+				m.isEP = true;
+			}
+			EPTargets.reset();
+			//if the move is a two square move, set the en passent target
+			if (origin - target == 16)
+				EPTargets.set(origin - 8, 1);
 		}
+		
 		break;
 	case n:
 		if (c == white) {
-			Wn.set(origin, 0);
-			Wn.set(target, 1);
+			Wn.set(origin, 0); Wn.set(target, 1);
 		}
 		else {
-			Bn.set(origin, 0);
-			Bn.set(target, 1);
+			Bn.set(origin, 0); Bn.set(target, 1);
 		}
 		break;
 	case b:
 		if (c == white) {
-			Wb.set(origin, 0);
-			Wb.set(target, 1);
+			Wb.set(origin, 0); Wb.set(target, 1);
 		}
 		else {
-			Bb.set(origin, 0);
-			Bb.set(target, 1);
+			Bb.set(origin, 0); Bb.set(target, 1);
 		}
 		break;
 	case r:
 		if (c == white) {
-			Wr.set(origin, 0);
-			Wr.set(target, 1);
+			Wr.set(origin, 0); Wr.set(target, 1);
 			if (origin == 0) castlingRights.set(1, 0);
 			if (origin == 7) castlingRights.set(0, 0);
 		}
 		else {
-			Br.set(origin, 0);
-			Br.set(target, 1);
+			Br.set(origin, 0); Br.set(target, 1);
 			if (origin == 56) castlingRights.set(3, 0);
 			if (origin == 63) castlingRights.set(2, 0);
 		}
 		break;
 	case q:
 		if (c == white) {
-			Wq.set(origin, 0);
-			Wq.set(target, 1);
+			Wq.set(origin, 0); Wq.set(target, 1);
 		}
 		else {
-			Bq.set(origin, 0);
-			Bq.set(target, 1);
+			Bq.set(origin, 0); Bq.set(target, 1);
 		}
 		break;
 	case k:
 		if (c == white) {
-			Wk.set(origin, 0);
-			Wk.set(target, 1);
+			Wk.set(origin, 0); Wk.set(target, 1);
+			
 			if (origin - target == 2) {
-				Wr.set(0, 0);
-				Wr.set(3, 1);
+				Wr.set(0, 0); Wr.set(3, 1);
 				m.isCastle = true;
 			}
 			else if (target - origin == 2) {
-				Wr.set(7, 0);
-				Wr.set(5, 1);
+				Wr.set(7, 0); Wr.set(5, 1);
 				m.isCastle = true;
 			}
 			castlingRights.set(0, 0);
 			castlingRights.set(1, 0);
 		}
 		else {
-			Bk.set(origin, 0);
-			Bk.set(target, 1);
+			Bk.set(origin, 0); Bk.set(target, 1);
 			if (origin - target == 2) {
-				Br.set(56, 0);
-				Br.set(59, 1);
+				Br.set(56, 0); Br.set(59, 1);
 				m.isCastle = true;
 			}
 			else if (target - origin == 2) {
-				Br.set(61, 1);
-				Br.set(63, 0);
+				Br.set(61, 1); Br.set(63, 0);
 				m.isCastle = true;
 			}
 			castlingRights.set(2, 0);
@@ -454,7 +459,12 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 	Bpieces = Bp | Bn | Bb | Br | Bq | Bk;
 	Occupied = Wpieces | Bpieces;
 
+	if (t != p) EPTargets.reset();
+
 	turn = turn == white ? black : white;
+	HMcounter++;
+	if (c == black)
+		FMcounter++;
 
 	movesMade.push_back(m);
 }
@@ -465,6 +475,7 @@ void unmakeMove() {
 	Move move = movesMade.back();
 
 	castlingRights = pCastlingRights;
+	EPTargets = pEPTargets;
 
 	//set the destination to 0 in all the bitboards
 	Wp.set(move.getDestination(), 0); Bp.set(move.getDestination(), 0);
@@ -526,7 +537,11 @@ void unmakeMove() {
 
 
 	//if it was a diagonal pawn move but wasn't a take, then it was an en passent
-	//TODO: undo EP
+	if (move.isEP) {
+		int dir = move.getOrigin() - move.getDestination();
+		if (dir == -9 || dir == -7) Bp.set(move.getDestination() - 8, 1);
+		else if (dir == 9 || dir == 7) Wp.set(move.getDestination() + 8, 1);
+	}
 
 	//update the occupied bitboard
 	Wpieces = Wp | Wr | Wn | Wb | Wq | Wk;
@@ -597,7 +612,7 @@ bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t) {
 				unmakeMove();
 			}
 		}
-		break;
+		return moves;
 	case n:
 		mask = nA.getKnightAttacks(sq) & ~Occupied;
 		break;
@@ -633,7 +648,7 @@ bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t) {
 				}
 			}
 		}
-		if (sq == 60) {
+		else if (sq == 60) {
 			for (int i = 2; i < 4; i++) {
 				if (castlingRights.test(i)) {
 					int negative = i % 2 == 0 ? 1 : -1;
@@ -656,7 +671,6 @@ bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t) {
 		}
 		break;
 	}
-	if (t == p) return moves;
 	
 	for (int sq2 = 0; sq2 < 64; sq2++) {
 		if (!mask.test(sq2)) continue;
@@ -675,30 +689,41 @@ bitset<64> getLegalCaptures(enumSquare sq, Colour c, Type t) {
 	bitset<64> opponentBB = c == white ? Bpieces : Wpieces;
 	switch (t) {
 	case p:
-		if (c == white) {
-			if (sq >= 56) break;
-			if (sq % 8 > 0 && opponentBB.test(sq + 7)) {
-				makeMove(sq, static_cast<enumSquare>(sq + 7), c, t);
-				if(!isCheck(c)) captures.set(sq + 7, 1);
-				unmakeMove();
+		mask = pA.getPawnAttacks(sq, c) & opponentBB;
+		if (sq % 8 > 0) {
+			if (c == white) {
+				if ((32 <= sq && sq < 40) && EPTargets.test(sq + 7)) {
+					makeMove(sq, static_cast<enumSquare>(sq + 7), c, t);
+					if (!isCheck(c))
+						captures.set(sq + 7, 1);
+					unmakeMove();
+				}
 			}
-			if (sq % 8 < 7 && opponentBB.test(sq + 9)) {
-				makeMove(sq, static_cast<enumSquare>(sq + 9), c, t);
-				if (!isCheck(c)) captures.set(sq + 9, 1);
-				unmakeMove();
+			else {
+				if ((24 <= sq && sq < 32) && EPTargets.test(sq - 9)) {
+					makeMove(sq, static_cast<enumSquare>(sq - 9), c, t);
+					if (!isCheck(c))
+						captures.set(sq - 9, 1);
+					unmakeMove();
+				}
 			}
 		}
-		else {
-			if (sq < 8) break;
-			if (sq % 8 > 0 && opponentBB.test(sq - 9)) {
-				makeMove(sq, static_cast<enumSquare>(sq - 9), c, t);
-				if (!isCheck(c)) captures.set(sq - 9, 1);
-				unmakeMove();
+		if (sq % 8 < 7) {
+			if (c == white) {
+				if ((32 <= sq && sq < 40) && EPTargets.test(sq + 9)) {
+					makeMove(sq, static_cast<enumSquare>(sq + 9), c, t);
+					if (!isCheck(c))
+						captures.set(sq + 9, 1);
+					unmakeMove();
+				}
 			}
-			if (sq % 8 < 7 && opponentBB.test(sq - 7)) {
-				makeMove(sq, static_cast<enumSquare>(sq - 7), c, t);
-				if (!isCheck(c)) captures.set(sq - 7, 1);
-				unmakeMove();
+			else {
+				if ((24 <= sq && sq < 32) && EPTargets.test(sq - 7)) {
+					makeMove(sq, static_cast<enumSquare>(sq - 7), c, t);
+					if (!isCheck(c))
+						captures.set(sq - 7, 1);
+					unmakeMove();
+				}
 			}
 		}
 		break;
@@ -718,8 +743,6 @@ bitset<64> getLegalCaptures(enumSquare sq, Colour c, Type t) {
 		mask = kA.getKingAttacks(sq) & opponentBB;
 		break;
 	}
-
-	if (t == p) return captures;
 
 	for (int sq2 = 0; sq2 < 64; sq2++) {
 		if (!mask.test(sq2)) continue;
@@ -1065,6 +1088,8 @@ int main(int argc, char** argv) {
 	nA.setKnightAttacks();
 	sA.setRayAttacks();
 	kA.setKingAttacks();
+
+		
 	
 	init();
 	glutDisplayFunc(display);

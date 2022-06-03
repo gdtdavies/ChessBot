@@ -20,6 +20,7 @@ public:
 
 	bool isTake();	
 	bool isCastle = false;
+	bool isEP = false;
 };
 
 Move::Move() {}

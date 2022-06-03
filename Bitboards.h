@@ -13,6 +13,7 @@ bitset<64> Bpieces = Bp | Bn | Bb | Br | Bq | Bk;
 bitset<64> Occupied = Wpieces | Bpieces;
 
 bitset<64> EPTargets(0);
+bitset<64> pEPTargets(0);
 
 bitset<4> castlingRights(15);
 bitset<4> pCastlingRights(15);

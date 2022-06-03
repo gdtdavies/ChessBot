@@ -11,18 +11,14 @@ public:
 
 
 void pawnAttacks::setPawnAttacks() {
-	for (int sq = 0; sq < 64; sq++) {
-		if (sq >= 8) {
-			if (sq % 8 > 0) 
-				Battacks[sq].set(sq - 9, 1);
-			if (sq % 8 < 7)
-				Battacks[sq].set(sq - 7, 1);
+	for (int sq = 8; sq < 56; sq++) {
+		if (sq % 8 > 0) {
+			Battacks[sq].set(sq - 9, 1);
+			Wattacks[sq].set(sq + 7, 1);
 		}
-		if (sq < 56) {
-			if (sq % 8 > 0)
-				Wattacks[sq].set(sq + 7, 1);
-			if (sq % 8 < 7)
-				Wattacks[sq].set(sq + 9, 1);
+		if (sq % 8 < 7) {
+			Battacks[sq].set(sq - 7, 1);
+			Wattacks[sq].set(sq + 9, 1);
 		}
 	}
 }

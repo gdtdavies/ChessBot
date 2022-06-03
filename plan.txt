@@ -5,7 +5,7 @@ checklist to follow for the progress of the project:
  x Display the pieces
  x Allow the pieces to be moved by the mouse
  x Detect when the king is in check
- - Display when the king is in check
+ x Display when the king is in check
  x Restrict the piece movements to the allowed moves
  x Allow the pieces to capture opponent pieces
  - Detect when the game is over 
@@ -17,7 +17,7 @@ checklist to follow for the progress of the project:
  x Display the allowed moves when holding a piece or after clicking on a piece
  - Implement extra rules
 	x castling
-	- en passant
+	x en passant
 	- promotion
  - Check that the move generation is correct using perft
  =------------------------------------AI--------------------------------------=
