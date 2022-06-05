@@ -7,19 +7,15 @@
 #include "GL\glew.h"
 #include "GL\wglew.h"
 #pragma comment(lib, "glew32.lib")
-//--------------
-
 #include "glm\glm.hpp"
 #include "glm\gtc\matrix_transform.hpp"
 
 #include "GL\freeglut.h"
+//--------------
 
-#include "Bitboards.h"
-
-
-const enum Colour { white, black, NA };
-const enum Type {p, r, n, b, q, k, None};
-
+const enum Colour : int { white, black, NA };
+const enum Type : int {p, r, n, b, q, k, None};
+const enum Promotion : int {toN, toB, toR, toQ, toNone};
 const enum enumSquare : int {
 	a1, b1, c1, d1, e1, f1, g1, h1,
 	a2, b2, c2, d2, e2, f2, g2, h2,
@@ -31,23 +27,23 @@ const enum enumSquare : int {
 	a8, b8, c8, d8, e8, f8, g8, h8, null
 };
 
+#include "Bitboards.h"
 #include "LookupBitBoards/pawn.h"
 #include "LookupBitBoards/knight.h"
 #include "LookupBitBoards/king.h"
 #include "LookupBitBoards/slidingPieces.h"
-
 #include "Move.h"
 
 int screenWidth = 1000, screenHeight = 1000;
-int sqW, sqH;
-glm::mat4 ViewMatrix;					// matrix for the modelling and viewing
-glm::mat4 ProjectionMatrix;			// matrix for the orthographic projection
+double sqW, sqH;
+
+glm::mat4 ViewMatrix, ProjectionMatrix;
 
 Colour turn;
 
 int HMcounter = 0, FMcounter = 0;
 
-enumSquare originSq = null;
+enumSquare originSq = null, targetSq = null;
 
 pawnAttacks pA;
 knightAttacks nA;
@@ -60,15 +56,20 @@ bitset<64> attackBB(0);
 
 bool Checkmate = false, Stalemate = false;
 bool Wcheck = false, Bcheck = false;
+bool isPromoting = false;
+
+Promotion promotionChoice = toNone;
 
 //-------------------------------------------------------------------------------------------------
 void mouseCallback(int button, int state, int x, int y);
-void drawPiece(int x, int y, Colour c, Type t);
+void drawPiece(float x, float y, Colour c, Type t);
 void drawBoard();
 void drawSelected(int rank, int file);
 void drawAttacks(bitset<64>);
+void drawPromotion();
 
-void makeMove(enumSquare origin, enumSquare target, Colour c, Type t);
+void makeMove(enumSquare origin, enumSquare target, Colour c, Type t, Promotion promoteTo);
+void unmakeMove();
 bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t);
 bitset<64> getLegalCaptures(enumSquare sq, Colour c, Type t);
 
@@ -76,8 +77,19 @@ bool isCheck(Colour colourInCheck);
 bool isCheckMate(Colour colourInCheck);
 bool isStaleMate(Colour colourToMove);
 
-Colour getPieceColour(int pos);
-Type getPieceType(int pos);
+Colour getPieceColour(int sq);
+Type getPieceType(int sq);
+int getFirstOfRank(int sq);
+int getlastOfRank(int sq);
+
+bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t);
+bitset<64> getLegalCaptures(enumSquare sq, Colour c, Type t);
+
+bool isCheck(Colour colourInCheck);
+bool isCheckMate(Colour colourInCheck);
+bool isStaleMate(Colour colourToMove);
+
+void loadFromFen(string fen);
 
 //=================================<<--------------------------->>================================//
 //=================================<< START OF OPENGL FUNCTIONS >>================================//
@@ -97,15 +109,12 @@ void display() {
 
 	glEnable(GL_BLEND);
 
-	glm::mat4 ModelViewMatrix;
-
 	drawBoard();
 
 	if (originSq != null) {
 		drawSelected(originSq / 8, originSq % 8);
 		drawAttacks(attackBB);
 	}
-
 
 	for (int sq = 0; sq < 64; sq++) {
 		if (!Occupied.test(sq)) continue;
@@ -126,6 +135,9 @@ void display() {
 		else if (Wk.test(sq)) drawPiece(rank, file, white, k);
 		else if (Bk.test(sq)) drawPiece(rank, file, black, k);
 	}
+
+	if (isPromoting) 
+		drawPromotion();
 
 	if (Checkmate)
 		cout << "checkmate" << endl;
@@ -171,42 +183,73 @@ void mouseCallback(int button, int state, int x, int y) {
 	
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) return;
 
-	for (int sq = 0; sq < 64; sq++) {
-		int squareX = (sq % 8) * width + width / 2;
-		int squareY = (sq / 8) * height + height / 2;
+	//Get promotion choice----------------------------------------------------------------------------------------
+	if (isPromoting) {
+		for (int i = 0; i < 4; i++) 
+		{
+			float squareX = ((i + 26) % 8) * width + width / 2;
+			float squareY = ((i + 26) / 8) * height + height;
+			if (squareX - width / 2 < x && x < squareX + width / 2) {
+				if (squareY - height < y && y < squareY + height) 
+					promotionChoice = static_cast<Promotion>(i);
+			}
+		}
+	}
+	//check every square------------------------------------------------------------------------------------------
+	for (int sq = 0; sq < 64; sq++) 
+	{
+		float squareX = (sq % 8) * width + width / 2;
+		float squareY = (sq / 8) * height + height / 2;
 		if (squareX - width / 2 < x && x < squareX + width / 2) {
 			if (squareY - height / 2 < y && y < squareY + height / 2) {
-				if(Wpieces.test(sq) && turn == white || Bpieces.test(sq) && turn == black) {
-					if (originSq != static_cast<enumSquare>(sq)) {
-						originSq = static_cast<enumSquare>(sq);
-						attackBB = getLegalMoves(originSq, getPieceColour(originSq), getPieceType(originSq))
-							| getLegalCaptures(originSq, getPieceColour(originSq), getPieceType(originSq));
+				if (!isPromoting) {
+					targetSq = null;
+					if (Wpieces.test(sq) && turn == white || Bpieces.test(sq) && turn == black) {
+						if (originSq != static_cast<enumSquare>(sq)) { // if the origin square is not the same as the selected square
+							originSq = static_cast<enumSquare>(sq);
+							attackBB = getLegalMoves(originSq, getPieceColour(originSq), getPieceType(originSq))
+								| getLegalCaptures(originSq, getPieceColour(originSq), getPieceType(originSq));
+						}
+						else
+							originSq = null;
+						return;
 					}
-					else 
+					if (originSq == null) return; 
+					
+					targetSq = static_cast<enumSquare>(sq);
+
+					if (getPieceType(originSq) == p) {
+						if ((56 <= targetSq && getPieceColour(originSq) == white) || (targetSq < 8 && getPieceColour(originSq) == black)) {
+							isPromoting = true;
+							return;
+						}
+					}
+
+				}
+				else {
+					if(promotionChoice == toNone){
 						originSq = null;
-					return;
+						targetSq = null;
+						isPromoting = false;
+						promotionChoice = toNone;
+						return;
+					}
 				}
 
 				if (originSq == null) return;
-				
-				int rank = originSq / 8;
-				int file = originSq % 8;
+				if (targetSq == null) return;
 
-				enumSquare targetSq = static_cast<enumSquare>(sq);
-				Colour targetColour = getPieceColour(targetSq);
-
-				Colour originColour = getPieceColour(originSq);
-				Type originType = getPieceType(originSq);
-				
 				if (!attackBB.test(targetSq)) return;
 				
-				makeMove(originSq, targetSq, originColour, originType);
+				makeMove(originSq, targetSq, getPieceColour(originSq), getPieceType(originSq), promotionChoice);
 
 				Wcheck = isCheck(white); Bcheck = isCheck(black);
 				Checkmate = isCheckMate(turn);
 				Stalemate = isStaleMate(turn);
 
 				originSq = null;
+				targetSq = null;
+				isPromoting = false;
 			}
 		}
 	}
@@ -215,7 +258,6 @@ void mouseCallback(int button, int state, int x, int y) {
 //===================================<<---------------------->>===================================//
 //===================================<< END OPENGL FUNCTIONS >>===================================//
 //===================================<<---------------------->>===================================//
-
 
 void drawLine(float x1, float y1, float x2, float y2, Colour c) {
 	glBegin(GL_LINES);
@@ -227,7 +269,7 @@ void drawLine(float x1, float y1, float x2, float y2, Colour c) {
 	glEnd();
 }
 
-void drawPiece(int rank, int file, Colour c, Type t) {
+void drawPiece(float rank, float file, Colour c, Type t) {
 	float w = (sqW * 0.5) / double(screenWidth);
 	float h = (sqH * 0.5) / double(screenHeight);
 
@@ -334,9 +376,33 @@ void drawAttacks(bitset<64> attacks) {
 	}
 }
 
+void drawPromotion() {
+	double w = sqW / double(screenWidth);
+	double h = sqH / double(screenHeight);
+
+	enumSquare squares[8] = { c4, d4, e4, f4, c5, d5, e5, f5 };
+	for (enumSquare sq : squares) {
+		double x = sq % 8 * w - 0.762;
+		double y = sq / 8 * h - 0.762;
+
+		glBegin(GL_POLYGON);
+		turn == white ? glColor3f(0.0, 0.0, 0.0) : glColor3f(1.0, 1.0, 1.0);
+		glVertex2d(x - w / 2., y - h / 2.);
+		glVertex2d(x - w / 2., y + h / 2.);
+		glVertex2d(x + w / 2., y + h / 2.);
+		glVertex2d(x + w / 2., y - h / 2.);
+		glEnd();
+	}
+
+	drawPiece(3.5, 2, turn, n);
+	drawPiece(3.5, 3, turn, b);
+	drawPiece(3.5, 4, turn, r);
+	drawPiece(3.5, 5, turn, q);
+}
+
 //================||==================||==================||==================||==================>>
 
-void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
+void makeMove(enumSquare origin, enumSquare target, Colour c, Type t, Promotion promoteTo = toNone) {
 	
 	Move m = Move(origin, target, c, t);
 	
@@ -346,7 +412,6 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 
 	pCastlingRights = castlingRights;
 	pEPTargets = EPTargets;
-	
 
 	//empty the square to be taken in all bitboards
 	Bp.set(target, 0); Bn.set(target, 0); Bb.set(target, 0);
@@ -368,6 +433,15 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 			//if the move is a two square move, set the en passent target
 			if (target - origin == 16)
 				EPTargets.set(origin + 8, 1);
+
+			if (56 <= target && target < 64) {
+				Wp.set(target, 0);
+				promoteTo == toN ? Wn.set(target, 1) :
+					promoteTo == toB ? Wb.set(target, 1) :
+					promoteTo == toR ? Wr.set(target, 1) :
+					promoteTo == toQ ? Wq.set(target, 1) :
+					__noop;
+			}
 		}
 		else {
 			Bp.set(origin, 0); Bp.set(target, 1);
@@ -380,6 +454,15 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 			//if the move is a two square move, set the en passent target
 			if (origin - target == 16)
 				EPTargets.set(origin - 8, 1);
+
+			if (0 <= target && target < 8) {
+				Wp.set(target, 0);
+				promoteTo == toN ? Bn.set(target, 1) :
+					promoteTo == toB ? Bb.set(target, 1) :
+					promoteTo == toR ? Br.set(target, 1) :
+					promoteTo == toQ ? Bq.set(target, 1) :
+					__noop;
+			}
 		}
 		
 		break;
@@ -551,20 +634,20 @@ void unmakeMove() {
 //================||==================||==================||==================||==================>>
 
 //returns the type of the piece in the entered square
-Type getPieceType(int square) {
-	if (Wp.test(square) || Bp.test(square)) return p;
-	if (Wr.test(square) || Br.test(square)) return r;
-	if (Wn.test(square) || Bn.test(square)) return n;
-	if (Wb.test(square) || Bb.test(square)) return b;
-	if (Wq.test(square) || Bq.test(square)) return q;
-	if (Wk.test(square) || Bk.test(square)) return k;
+Type getPieceType(int sq) {
+	if (Wp.test(sq) || Bp.test(sq)) return p;
+	if (Wr.test(sq) || Br.test(sq)) return r;
+	if (Wn.test(sq) || Bn.test(sq)) return n;
+	if (Wb.test(sq) || Bb.test(sq)) return b;
+	if (Wq.test(sq) || Bq.test(sq)) return q;
+	if (Wk.test(sq) || Bk.test(sq)) return k;
 	return None;
 }
 
 //returns the colour of the piece in the entered square
-Colour getPieceColour(int square) {
-	if (Wpieces.test(square)) return white;
-	if (Bpieces.test(square)) return black;
+Colour getPieceColour(int sq) {
+	if (Wpieces.test(sq)) return white;
+	if (Bpieces.test(sq)) return black;
 	return NA;
 }
 

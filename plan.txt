@@ -20,7 +20,7 @@ checklist to follow for the progress of the project:
  - Implement extra rules
 	x castling
 	x en passant
-	- promotion
+	x promotion
  - Check that the move generation is correct using perft
  =------------------------------------AI--------------------------------------=
  - Make basic board evaluation method (material only)

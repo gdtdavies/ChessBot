@@ -38,6 +38,7 @@ Move::Move(int o, int d, Colour c, Type t, Type tt) {
 	takenType = tt;
 }
 
+
 int Move::getOrigin() {
 	return origin;
 }
@@ -54,9 +55,11 @@ Type Move::getTakenType() {
 	return takenType;
 }
 
+
 void Move::setTakenType(Type tt) {
 	takenType = tt;
 }
+
 
 bool Move::isTake() {
 	return takenType != None;
