@@ -10,10 +10,12 @@ checklist to follow for the progress of the project:
  x Allow the pieces to capture opponent pieces
  - Detect when the game is over 
 	x checkmate
-	- stalemate
+	x stalemate
+	- draw
  - Display when the game is over
 	- checkmate
 	- stalemate
+	- draw
  x Display the allowed moves when holding a piece or after clicking on a piece
  - Implement extra rules
 	x castling

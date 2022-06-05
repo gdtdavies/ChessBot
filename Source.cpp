@@ -38,12 +38,11 @@ const enum enumSquare : int {
 
 #include "Move.h"
 
-int screenWidth = 900, screenHeight = 900;
+int screenWidth = 1000, screenHeight = 1000;
 int sqW, sqH;
 glm::mat4 ViewMatrix;					// matrix for the modelling and viewing
 glm::mat4 ProjectionMatrix;			// matrix for the orthographic projection
 
-int nbPiecesOnBoard = 0;
 Colour turn;
 
 int HMcounter = 0, FMcounter = 0;
@@ -57,9 +56,9 @@ kingAttacks kA;
 
 vector<Move> movesMade;
 
-bitset<64> currentAttacks(0);
+bitset<64> attackBB(0);
 
-bool Checkmate = false;
+bool Checkmate = false, Stalemate = false;
 bool Wcheck = false, Bcheck = false;
 
 //-------------------------------------------------------------------------------------------------
@@ -68,7 +67,6 @@ void drawPiece(int x, int y, Colour c, Type t);
 void drawBoard();
 void drawSelected(int rank, int file);
 void drawAttacks(bitset<64>);
-bitset<64> getAttacks(enumSquare sq);
 
 void makeMove(enumSquare origin, enumSquare target, Colour c, Type t);
 bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t);
@@ -76,6 +74,7 @@ bitset<64> getLegalCaptures(enumSquare sq, Colour c, Type t);
 
 bool isCheck(Colour colourInCheck);
 bool isCheckMate(Colour colourInCheck);
+bool isStaleMate(Colour colourToMove);
 
 Colour getPieceColour(int pos);
 Type getPieceType(int pos);
@@ -104,11 +103,8 @@ void display() {
 
 	if (originSq != null) {
 		drawSelected(originSq / 8, originSq % 8);
-		drawAttacks(currentAttacks);
+		drawAttacks(attackBB);
 	}
-	
-	if (Checkmate)
-		cout << "checkmate" << endl;
 
 
 	for (int sq = 0; sq < 64; sq++) {
@@ -131,6 +127,10 @@ void display() {
 		else if (Bk.test(sq)) drawPiece(rank, file, black, k);
 	}
 
+	if (Checkmate)
+		cout << "checkmate" << endl;
+	if (Stalemate)
+		cout << "stalemate" << endl;
 
 	glDisable(GL_BLEND);
 	glutSwapBuffers();
@@ -179,7 +179,8 @@ void mouseCallback(int button, int state, int x, int y) {
 				if(Wpieces.test(sq) && turn == white || Bpieces.test(sq) && turn == black) {
 					if (originSq != static_cast<enumSquare>(sq)) {
 						originSq = static_cast<enumSquare>(sq);
-						currentAttacks = getAttacks(originSq);
+						attackBB = getLegalMoves(originSq, getPieceColour(originSq), getPieceType(originSq))
+							| getLegalCaptures(originSq, getPieceColour(originSq), getPieceType(originSq));
 					}
 					else 
 						originSq = null;
@@ -197,16 +198,15 @@ void mouseCallback(int button, int state, int x, int y) {
 				Colour originColour = getPieceColour(originSq);
 				Type originType = getPieceType(originSq);
 				
-				if (!currentAttacks.test(targetSq)) return;
+				if (!attackBB.test(targetSq)) return;
 				
 				makeMove(originSq, targetSq, originColour, originType);
 
 				Wcheck = isCheck(white); Bcheck = isCheck(black);
 				Checkmate = isCheckMate(turn);
+				Stalemate = isStaleMate(turn);
 
 				originSq = null;
-
-				cout << EPTargets.to_string() << endl;
 			}
 		}
 	}
@@ -301,7 +301,7 @@ void drawSelected(int rank, int file) {
 	double x = file * w - 0.762;
 	double y = rank * h - 0.762;
 	glBegin(GL_POLYGON);
-	glColor3f(1.0f, 0.0f, 0.0f);
+	glColor3f(0.5f, 0.25f, 0.75f);
 	glVertex2d(x - w / 2., y - h / 2.);
 	glVertex2d(x - w / 2., y + h / 2.);
 	glVertex2d(x + w / 2., y + h / 2.);
@@ -323,7 +323,7 @@ void drawAttacks(bitset<64> attacks) {
 		
 		glBegin(GL_LINE_LOOP);
 		
-		getPieceType(i) == None ? glColor3f(0.0f, 1.0f, 0.0f) : glColor3f(1.0f, 0.0f, 0.0f);
+		getPieceType(i) == None ? glColor3f(0.0f, 0.75f, 0.0f) : glColor3f(0.75f, 0.0f, 0.0f);
 		for (int j = 0; j < 20; j++) {
 			float theta = 2.0f * 3.1415926f * float(j) / float(20);//get the current angle 
 			float x = w/2 * cosf(theta);//calculate the x component 
@@ -332,12 +332,6 @@ void drawAttacks(bitset<64> attacks) {
 		}
 		glEnd();
 	}
-}
-
-bitset<64> getAttacks(enumSquare sq) {
-	bitset<64> moves = getLegalMoves(sq, getPieceColour(sq), getPieceType(sq));
-	bitset<64> captures = getLegalCaptures(sq, getPieceColour(sq), getPieceType(sq));
-	return moves | captures;
 }
 
 //================||==================||==================||==================||==================>>
@@ -469,7 +463,6 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t) {
 	movesMade.push_back(m);
 }
 
-
 void unmakeMove() {
 	if (movesMade.empty()) return;
 	Move move = movesMade.back();
@@ -514,7 +507,6 @@ void unmakeMove() {
 		else if (move.getTakenType() == k)
 			move.getColour() == white ? Bk.set(move.getDestination(), 1) : Wk.set(move.getDestination(), 1);
 
-		nbPiecesOnBoard++;
 	}
 	else if (move.isCastle) {
 		if (move.getDestination() == 2) { //white queen side castle
@@ -957,6 +949,36 @@ bool isCheckMate(Colour colourInCheck) {
 	return true;
 }
 
+bool isStaleMate(Colour colourToMove) {
+
+	if (isCheck(colourToMove)) return false;
+
+	bitset<64> colourBB = colourToMove == white ? Wpieces : Bpieces;
+
+
+	for (int origin = 0; origin < 64; origin++) {
+		if (!colourBB.test(origin)) continue;
+
+		Colour c = colourToMove;
+		Type t = getPieceType(origin);
+
+		bitset<64> attacks = getLegalMoves(static_cast<enumSquare>(origin), c, t)
+			| getLegalCaptures(static_cast<enumSquare>(origin), c, t);
+
+		if (attacks.none()) continue;
+		for (int target = 0; target < 64; target++) {
+			if (!attacks.test(target)) continue;
+			makeMove(static_cast<enumSquare>(origin), static_cast<enumSquare>(target), c, t);
+			if (!isCheck(colourToMove)) {
+				unmakeMove();
+				return false;
+			}
+			unmakeMove();
+		}
+	}
+	return true;
+}
+
 //takes in a FEN string and updates the bitboards
 void loadFromFen(string fen) {
 	string fen_info[6] = { "", "", "", "", "", "" };
@@ -989,15 +1011,12 @@ void loadFromFen(string fen) {
 		fen_info[0].append(fenRow[i]);
 
 	//=Piece Positions=======================================================0=|
-	Wp.reset();	Wr.reset();
-	Wn.reset();	Wb.reset();
-	Wq.reset();	Wk.reset();
+	Wp.reset();	Wr.reset(); Wn.reset();	
+	Wb.reset(); Wq.reset();	Wk.reset();
 
-	Bp.reset();	Br.reset();
-	Bn.reset();	Bb.reset();
-	Bq.reset();	Bk.reset();
+	Bp.reset();	Br.reset(); Bn.reset();
+	Bb.reset(); Bq.reset();	Bk.reset();
 
-	nbPiecesOnBoard = 0;
 
 	int pos = 0;
 	for (char c : fen_info[0]) {
@@ -1005,7 +1024,6 @@ void loadFromFen(string fen) {
 			pos += int(c) - 48;
 			continue;
 		}
-		nbPiecesOnBoard++;
 		c == 'P' ? Wp.set(pos, 1) :
 		c == 'p' ? Bp.set(pos, 1) :
 		c == 'R' ? Wr.set(pos, 1) :
@@ -1089,8 +1107,6 @@ int main(int argc, char** argv) {
 	sA.setRayAttacks();
 	kA.setKingAttacks();
 
-		
-	
 	init();
 	glutDisplayFunc(display);
 	glutIdleFunc(idle);
