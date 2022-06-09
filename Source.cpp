@@ -2,6 +2,7 @@
 #include<string>
 #include<bitset>
 #include<vector>
+#include<chrono>
 
 //--- OpenGL ---
 #include "GL\glew.h"
@@ -182,6 +183,8 @@ void mouseCallback(int button, int state, int x, int y) {
 	y += height * 4;
 	
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) return;
+	
+	if (Checkmate || Stalemate) return;
 
 	//Get promotion choice----------------------------------------------------------------------------------------
 	if (isPromoting) {
@@ -205,8 +208,8 @@ void mouseCallback(int button, int state, int x, int y) {
 				if (!isPromoting) {
 					targetSq = null;
 					if (Wpieces.test(sq) && turn == white || Bpieces.test(sq) && turn == black) {
-						if (originSq != static_cast<enumSquare>(sq)) { // if the origin square is not the same as the selected square
-							originSq = static_cast<enumSquare>(sq);
+						if (originSq != static_cast<enumSquare>(sq)) { 
+							originSq = static_cast<enumSquare>(sq); 
 							attackBB = getLegalMoves(originSq, getPieceColour(originSq), getPieceType(originSq))
 								| getLegalCaptures(originSq, getPieceColour(originSq), getPieceType(originSq));
 						}
@@ -224,7 +227,6 @@ void mouseCallback(int button, int state, int x, int y) {
 							return;
 						}
 					}
-
 				}
 				else {
 					if(promotionChoice == toNone){
@@ -236,13 +238,11 @@ void mouseCallback(int button, int state, int x, int y) {
 					}
 				}
 
-				if (originSq == null) return;
-				if (targetSq == null) return;
+				if (originSq == null || targetSq == null) return;
 
 				if (!attackBB.test(targetSq)) return;
 				
 				makeMove(originSq, targetSq, getPieceColour(originSq), getPieceType(originSq), promotionChoice);
-
 				Wcheck = isCheck(white); Bcheck = isCheck(black);
 				Checkmate = isCheckMate(turn);
 				Stalemate = isStaleMate(turn);
@@ -381,12 +381,12 @@ void drawPromotion() {
 	double h = sqH / double(screenHeight);
 
 	enumSquare squares[8] = { c4, d4, e4, f4, c5, d5, e5, f5 };
+	turn == white ? glColor3f(0.0, 0.0, 0.0) : glColor3f(1.0, 1.0, 1.0);
 	for (enumSquare sq : squares) {
 		double x = sq % 8 * w - 0.762;
 		double y = sq / 8 * h - 0.762;
 
-		glBegin(GL_POLYGON);
-		turn == white ? glColor3f(0.0, 0.0, 0.0) : glColor3f(1.0, 1.0, 1.0);
+		glBegin(GL_POLYGON);	
 		glVertex2d(x - w / 2., y - h / 2.);
 		glVertex2d(x - w / 2., y + h / 2.);
 		glVertex2d(x + w / 2., y + h / 2.);
@@ -398,6 +398,13 @@ void drawPromotion() {
 	drawPiece(3.5, 3, turn, b);
 	drawPiece(3.5, 4, turn, r);
 	drawPiece(3.5, 5, turn, q);
+	for (int i = 3; i <= 5; i++) {
+		double x = i * w - 0.762 - w / 2.;
+		double y1 = 3 * h - 0.762 - h / 2.;
+		double y2 = 5 * h - 0.762 - h / 2.;
+		drawLine(x, y1, x, y2, turn);
+	}
+
 }
 
 //================||==================||==================||==================||==================>>
@@ -456,7 +463,7 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t, Promotion 
 				EPTargets.set(origin - 8, 1);
 
 			if (0 <= target && target < 8) {
-				Wp.set(target, 0);
+				Bp.set(target, 0);
 				promoteTo == toN ? Bn.set(target, 1) :
 					promoteTo == toB ? Bb.set(target, 1) :
 					promoteTo == toR ? Br.set(target, 1) :
@@ -468,38 +475,42 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t, Promotion 
 		break;
 	case n:
 		if (c == white) {
-			Wn.set(origin, 0); Wn.set(target, 1);
+			Wn.set(origin, 0); 
+			Wn.set(target, 1);
 		}
 		else {
-			Bn.set(origin, 0); Bn.set(target, 1);
+			Bn.set(origin, 0); 
+			Bn.set(target, 1);
 		}
 		break;
 	case b:
 		if (c == white) {
-			Wb.set(origin, 0); Wb.set(target, 1);
+			Wb.set(origin, 0); 
+			Wb.set(target, 1);
 		}
 		else {
-			Bb.set(origin, 0); Bb.set(target, 1);
+			Bb.set(origin, 0); 
+			Bb.set(target, 1);
 		}
 		break;
 	case r:
 		if (c == white) {
-			Wr.set(origin, 0); Wr.set(target, 1);
-			if (origin == 0) castlingRights.set(1, 0);
-			if (origin == 7) castlingRights.set(0, 0);
+			Wr.set(origin, 0); 
+			Wr.set(target, 1);
 		}
 		else {
-			Br.set(origin, 0); Br.set(target, 1);
-			if (origin == 56) castlingRights.set(3, 0);
-			if (origin == 63) castlingRights.set(2, 0);
+			Br.set(origin, 0);
+			Br.set(target, 1);
 		}
 		break;
 	case q:
 		if (c == white) {
-			Wq.set(origin, 0); Wq.set(target, 1);
+			Wq.set(origin, 0);
+			Wq.set(target, 1);
 		}
 		else {
-			Bq.set(origin, 0); Bq.set(target, 1);
+			Bq.set(origin, 0);
+			Bq.set(target, 1);
 		}
 		break;
 	case k:
@@ -514,8 +525,6 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t, Promotion 
 				Wr.set(7, 0); Wr.set(5, 1);
 				m.isCastle = true;
 			}
-			castlingRights.set(0, 0);
-			castlingRights.set(1, 0);
 		}
 		else {
 			Bk.set(origin, 0); Bk.set(target, 1);
@@ -527,14 +536,26 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t, Promotion 
 				Br.set(61, 1); Br.set(63, 0);
 				m.isCastle = true;
 			}
-			castlingRights.set(2, 0);
-			castlingRights.set(3, 0);
 		}
 		break;
 	}
 	Wpieces = Wp | Wn | Wb | Wr | Wq | Wk;
 	Bpieces = Bp | Bn | Bb | Br | Bq | Bk;
 	Occupied = Wpieces | Bpieces;
+
+	if (origin == 4) {
+		castlingRights.set(0, 0);
+		castlingRights.set(1, 0);
+	}
+	else if (origin == 60) {
+		castlingRights.set(2, 0);
+		castlingRights.set(3, 0);
+	}
+
+	if (origin ==  0 || target ==  0) castlingRights.set(0, 0);
+	if (origin ==  7 || target ==  7) castlingRights.set(1, 0);
+	if (origin == 56 || target == 56) castlingRights.set(2, 0);
+	if (origin == 63 || target == 63) castlingRights.set(3, 0);
 
 	if (t != p) EPTargets.reset();
 
@@ -704,7 +725,7 @@ bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t) {
 		mask = kA.getKingAttacks(sq) & ~Occupied;
 		if (sq == 4) {
 			for (int i = 0; i < 2; i++) {
-				int negative = i % 2 == 0 ? 1 : -1;
+				int negative = i % 2 == 0 ? -1 : 1;
 				if (castlingRights.test(i)) {
 					if (!Occupied.test(sq + negative) && !Occupied.test(sq + negative * 2)) {
 						if (!isCheck(c)) {
@@ -726,7 +747,7 @@ bitset<64> getLegalMoves(enumSquare sq, Colour c, Type t) {
 		else if (sq == 60) {
 			for (int i = 2; i < 4; i++) {
 				if (castlingRights.test(i)) {
-					int negative = i % 2 == 0 ? 1 : -1;
+					int negative = i % 2 == 0 ? -1 : 1;
 					if (!Occupied.test(sq + negative) && !Occupied.test(sq + negative * 2)) {
 						if (!isCheck(c)) {
 							makeMove(sq, static_cast<enumSquare>(sq + negative), c, t);
@@ -1162,6 +1183,8 @@ void loadFromFen(string fen) {
 //=======================================<< MAIN FUNCTION >>======================================//
 //=======================================<<--------------->>======================================//
 
+#include "Testing.h"
+
 int main(int argc, char** argv) {
 	glutInit(&argc, argv);
 
@@ -1177,19 +1200,30 @@ int main(int argc, char** argv) {
 	if (GLEW_OK != err)
 		std::cout << " GLEW ERROR" << std::endl;
 
-	loadFromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ");
-	//loadFromFen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 ");
-	//loadFromFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1 ");	
-	//loadFromFen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1 ");
-	//loadFromFen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1 ");
-	//loadFromFen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8 ");
-	//loadFromFen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ");
-
 	pA.setPawnAttacks();
 	nA.setKnightAttacks();
 	sA.setRayAttacks();
 	kA.setKingAttacks();
 
+	//loadFromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ");
+	//loadFromFen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 ");
+	//loadFromFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1 ");	
+	//loadFromFen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1 ");	
+	//loadFromFen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1 ");
+	loadFromFen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8 ");
+	//loadFromFen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ");
+
+	Tester tester;
+	
+	//perft tests	
+	for (int i = 1; i <= 4; i++) {
+		auto start = chrono::high_resolution_clock::now();
+		int result = tester.perft(i);
+		auto end = chrono::high_resolution_clock::now();
+		cout << "test " << i << ": " << result << endl;
+		cout << chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000000. << endl << endl;
+	}
+	
 	init();
 	glutDisplayFunc(display);
 	glutIdleFunc(idle);
