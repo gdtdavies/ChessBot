@@ -25,8 +25,8 @@ checklist to follow for the progress of the project:
  =------------------------------------AI--------------------------------------=
  x Make basic board evaluation method (material only)
  - allow the computer to make a move based on the best next board
- - make basic minimax algoritm
- - add alpha-beta pruning
+ x make basic minimax algoritm
+ x add alpha-beta pruning
  - add move ordering
  - implement transposition tables
  - implement random book openings
