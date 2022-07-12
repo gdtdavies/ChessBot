@@ -258,9 +258,9 @@ void mouseCallback(int button, int state, int x, int y) {
 
 				moveCount++;
 
-				evaluator.minimax(6, -INFINITY, INFINITY);
-				cout << evaluator.getBestMove().getMoveCode() << " " << evaluator.evaluate() << endl;
-
+				evaluator.clear();
+				evaluator.minimax(4, -INFINITY, INFINITY);
+				cout << evaluator.getBestMove().getMoveCode() << endl;
 			}
 		}
 	}
@@ -1266,7 +1266,7 @@ int main(int argc, char** argv) {
 
 	Tester tester;
 	
-	evaluator.minimax(6, -INFINITY, INFINITY);
+	evaluator.minimax(4, -INFINITY, INFINITY);
 	cout << evaluator.getBestMove().getMoveCode() << endl;
 	
 	//perft tests	
