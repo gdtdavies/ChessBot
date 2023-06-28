@@ -9,7 +9,6 @@ public:
 };
 
 
-
 void pawnAttacks::setPawnAttacks() {
 	for (int sq = 8; sq < 56; sq++) {
 		if (sq % 8 > 0) {

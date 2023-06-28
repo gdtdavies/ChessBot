@@ -25,8 +25,8 @@ int Tester::perft(int depth)
 		Colour c = getPieceColour(origin);
 		Type t = getPieceType(origin);
 
-		bitset<64> attacks = getLegalMoves(static_cast<enumSquare>(origin), c, t)
-			             | getLegalCaptures(static_cast<enumSquare>(origin), c, t);
+		bitset<64> attacks = mg.getLegalMoves(static_cast<enumSquare>(origin), c, t)
+			             | mg.getLegalCaptures(static_cast<enumSquare>(origin), c, t);
 
 		if (attacks.none()) continue;
 		for (int target = 0; target < 64; target++) {

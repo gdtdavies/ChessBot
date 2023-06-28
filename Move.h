@@ -12,6 +12,10 @@ public:
 	Move(enumSquare o, enumSquare d, Colour c, Type t, Type tt);
 	Move(enumSquare o, enumSquare d, Colour c, Type t, Promotion promo);
 	Move(enumSquare o, enumSquare d, Colour c, Type t, Type tt, Promotion promo);
+
+	bool operator==(const Move& mv) const {
+		return origin == mv.origin && destination == mv.destination && type == mv.type && colour == mv.colour && takenType == mv.takenType && promotion == mv.promotion;
+	}
 	
 
 	enumSquare getOrigin();
@@ -22,12 +26,26 @@ public:
 	Promotion getPromotion();
 	string getMoveCode();
 
+	int getOriginValue();
+	int getDestinationValue();
+	int getTakeValue();
+	int getPromotionValue();
+
 	void setTakenType(Type tt);
 	void setPromotion(Promotion promo);
 
 	bool isTake();	
 	bool isCastle = false;
 	bool isEP = false;
+
+	bool isCheck = false;
+	bool isMate = false;
+	bool isDraw = false;
+
+	int score = 0;
+	bool operator <(const Move& mv) {
+		return mv.score < score;
+	}
 };
 
 Move::Move() {}
@@ -119,16 +137,44 @@ string Move::getMoveCode() {
 	}
 
 	// king code
-	//if (colour != NA) {
-	//	if (mate)
-	//		code += "#";
-	//	else if (check)
-	//		code += "+";
-	//}
+	if (colour != NA) {
+		if (isMate)
+			code += "#";
+		else if (isCheck)
+			code += "+";
+		else if (isDraw)
+			code += "1/2";
+	}
 
 	return code;
 }
 
+int Move::getOriginValue() {
+	return type == p ? 1 : type == n || type == b ? 3 : type == r ? 5 : type == q ? 9 : 0;
+}
+int Move::getDestinationValue() {
+	return takenType == p ? 1 : takenType == n || takenType == b ? 3 : takenType == r ? 5 : takenType == q ? 9 : 0;
+}
+int Move::getTakeValue() {
+	if (type == None || takenType == None) return 0;
+	int oValue = type == p ? 1 : (type == n || type == b) ? 3 : type == r ? 5 : type == q ? 9 : 0;
+	int dValue = takenType == p ? 1 : (takenType == n || takenType == b) ? 3 : takenType == r ? 5 : takenType == q ? 9 : 0;
+	return dValue - oValue;
+}
+int Move::getPromotionValue() {
+	if (promotion == toNone) return 0;
+	switch (promotion) {
+	case toN:
+	case toB:
+		return 3;
+	case toR:
+		return 5;
+	case toQ:
+		return 9;
+	default:
+		return 0;
+	}
+}
 
 void Move::setTakenType(Type tt) {
 	takenType = tt;
@@ -137,8 +183,6 @@ void Move::setPromotion(Promotion promo) {
 	promotion = promo;
 }
 
-
 bool Move::isTake() {
 	return takenType != None;
 }
-

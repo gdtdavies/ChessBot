@@ -1,5 +1,3 @@
-using namespace std;
-
 bitset<64> Wp(0), Bp(0);
 bitset<64> Wn(0), Bn(0);
 bitset<64> Wb(0), Bb(0);

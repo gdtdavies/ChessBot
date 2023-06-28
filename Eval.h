@@ -13,12 +13,14 @@ private:
 	float getPieceSquareTable();
 	float getPieceMobility(bitset<64> WpawnAttacks, bitset<64> BpawnAttacks);
 	float evalPawnStructure(int WpPerFile[8], int BpPerFile[8]);
+	float evalRookStructure(int WpPerFile[8], int BpPerFile[8]);
+	float evalKnightStructure(bitset<64> WpawnAttacks, bitset<64> BpawnAttacks);
 	float quiesce(float alpha, float beta);
 	Move findBestMove();
 public:
-	double evaluate();
+	double evaluate(int depth);
 	float minimax(int depth, float alpha, float beta);
-	void clear();
+	void reset();
 
 	Move getBestMove();
 };
@@ -43,8 +45,8 @@ float Evaluator::getPieceMobility(bitset<64> WpawnAttacks, bitset<64> BpawnAttac
 	for (int sq = 0; sq < 64; sq++) {
 		Type t = getPieceType(sq);
 		if (Wpieces.test(sq)) {
-			bitset<64> attacks = getLegalMoves(static_cast<enumSquare>(sq), white, t)
-				             | getLegalCaptures(static_cast<enumSquare>(sq), white, t);
+			bitset<64> attacks = mg.getLegalMoves(static_cast<enumSquare>(sq), white, t)
+				             | mg.getLegalCaptures(static_cast<enumSquare>(sq), white, t);
 			//When calculating knight mobility, it is advisable to omit squares 
 			//controlled by enemy pawns
 			if (Wn.test(sq))
@@ -52,8 +54,8 @@ float Evaluator::getPieceMobility(bitset<64> WpawnAttacks, bitset<64> BpawnAttac
 			Wmobility += attacks.count();
 		}
 		else if (Bpieces.test(sq)) {
-			bitset<64> attacks = getLegalMoves(static_cast<enumSquare>(sq), black, t)
-				             | getLegalCaptures(static_cast<enumSquare>(sq), black, t);
+			bitset<64> attacks = mg.getLegalMoves(static_cast<enumSquare>(sq), black, t)
+				             | mg.getLegalCaptures(static_cast<enumSquare>(sq), black, t);
 			if (Bn.test(sq))
 				attacks =  attacks & ~WpawnAttacks;
 			Bmobility += attacks.count();
@@ -111,20 +113,26 @@ float Evaluator::evalPawnStructure(int WpPerFile[8], int BpPerFile[8]) {
 	for (int sq = 8; sq < 56; sq++) {
 		if (Wp.test(sq) && Occupied.test(sq + 8))
 		{
-			if (sq % 8 > 0 && !Bpieces.test(sq + 7)) Wblocked++;
-			if (sq % 8 < 7 && !Bpieces.test(sq + 9)) Wblocked++;
+			if (sq % 8 == 0 && !Bpieces.test(sq + 9)) Wblocked++;
+			if (sq % 8 == 7 && !Bpieces.test(sq + 7)) Wblocked++;
+
+			if (sq % 8 > 0 && sq % 8 < 7)
+				if (!Bpieces.test(sq + 7) && !Bpieces.test(sq + 9)) Wblocked++;
 			//extra penalty if the center pawns are blocked on their home squares
-			if (sq == 11 || sq == 12) {
+			if ((sq == 11 || sq == 12)) {
 				if (!Bpieces.test(sq + 7) && !Bpieces.test(sq + 9))
 					Wblocked++;
 			}
 		}
 		if (Bp.test(sq) && Occupied.test(sq - 8))
 		{
-			if (sq % 8 > 0 && !Wpieces.test(sq - 9)) Bblocked++;
-			if (sq % 8 < 7 && !Wpieces.test(sq - 7)) Bblocked++;
+			if (sq % 8 == 0 && !Bpieces.test(sq - 7)) Bblocked++;
+			if (sq % 8 == 7 && !Bpieces.test(sq - 9)) Bblocked++;
+
+			if (sq % 8 > 0 && sq % 8 < 7)
+				if (!Wpieces.test(sq - 9) && !Wpieces.test(sq - 7)) Bblocked++;
 			//extra penalty if the center pawns are blocked on their home squares
-			if ((sq == 11 || sq == 12)) {
+			if ((sq == 51 || sq == 52)) {
 				if (!Wpieces.test(sq - 7) && !Wpieces.test(sq - 9))
 					Bblocked++;
 			}
@@ -169,9 +177,97 @@ float Evaluator::evalPawnStructure(int WpPerFile[8], int BpPerFile[8]) {
 	return (doubled + isolated + blocked + passed);
 }
 
-double Evaluator::evaluate() {
-	if (isStaleMate(turn)) return 0;
-	if (isCheckMate(turn)) return -INFINITY;
+float Evaluator::evalRookStructure(int WpPerFile[8], int BpPerFile[8]) {
+	float wScore = 0,
+		bScore = 0;
+	int WrPerFile[8] = { 0, 0, 0, 0, 0, 0, 0, 0 },
+		BrPerFile[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+	//bonus for rook on 7th and to a lesser extent 8th
+	wScore += (Wr & Rank7).count();
+	wScore += (Wr & Rank8).count() * 0.5;
+
+	bScore += (Br & Rank2).count();
+	bScore += (Br & Rank1).count() * 0.5;
+
+	for (int sq = 0; sq < 64; sq++) {
+		if (Wr.test(sq)) {
+			WrPerFile[sq % 8]++;
+			if (WpPerFile[sq % 8] == 0) {
+				//fully open file
+				if (BpPerFile[sq % 8] == 0) wScore++;
+				//semi open file
+				else if (BpPerFile[sq % 8] == 1) wScore += 0.5;
+			}
+			//Small bonus for a rook with enemy queen on the same file
+			for (int i = sq % 8; i < 64; i += 8) {
+				if (i == sq) continue;
+				if (!Bq.test(i)) continue;
+				wScore += 0.1;
+				break;
+			}
+		}
+		else if (Br.test(sq)) {
+			BrPerFile[sq % 8]++;
+			if (BpPerFile[sq % 8] == 0) {
+				//fully open file
+				if (WpPerFile[sq % 8] == 0) bScore++;
+				//semi open file
+				else if (WpPerFile[sq % 8] == 1) bScore += 0.5;
+			}
+			//Small bonus for a rook with enemy queen on the same file
+			for (int i = sq % 8; i < 64; i += 8) {
+				if (i == sq) continue;
+				if (!Wq.test(i)) continue;
+				bScore += 0.1;
+				break;
+			}
+		}
+	}
+	//find out if the rooks are doubled, give a bonus if they are
+	for (int file = 0; file < 8; file++) {
+		if (WrPerFile[file] == 2) wScore *= 2;
+		if (BrPerFile[file] == 2) bScore *= 2;
+	}
+
+
+	return wScore - bScore;
+}
+
+float Evaluator::evalKnightStructure(bitset<64> WpAttacks, bitset<64> BpAttacks) {
+	float wScore = 0,
+		bScore = 0;
+	//=outposts================================================================|
+	for (int sq = 33; sq < 47; sq++) {
+		if (sq % 8 == 0 || sq % 8 == 7) continue;
+		//if a knight is in the opponants half and protected by a pawn and not
+		//attacked by a pawn, it is an outpost
+		if (!Wn.test(sq)) continue; //continue if not a knight
+		//continue if not protected
+		if (!(Wp.test(sq - 9) || Wp.test(sq - 7))) continue;
+		//continue if attacked by pawn
+		if (Bp.test(sq + 7) || Bp.test(sq + 9)) continue;
+		wScore++;
+	}
+	for (int sq = 17; sq < 31; sq++) {
+		if (sq % 8 == 0 || sq % 8 == 7) continue;
+		if (!Bn.test(sq)) continue;
+		if (!(Bp.test(sq + 9) || Bp.test(sq + 7))) continue;
+		if (Wp.test(sq - 7) || Wp.test(sq - 9)) continue;
+		bScore++;
+	}
+
+	//=protected by pawn=======================================================|
+	// Marginal bonus for a knight defended by a pawn
+	wScore += (Wn & WpAttacks).count() * 0.25;
+	bScore += (Bn & BpAttacks).count() * 0.25;
+
+	return wScore - bScore;
+}
+
+double Evaluator::evaluate(int depth) {
+	if (isStaleMate(turn) || isDraw()) return 0;
+	if (isCheckMate(turn)) return -99999 - depth; // so that it proritises quicker mates
 
 	int WpPerFile[8] = { 0, 0, 0, 0, 0, 0, 0, 0 },
 		BpPerFile[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -202,25 +298,33 @@ double Evaluator::evaluate() {
 	float pieceSquareTable = getPieceSquareTable();
 	float mobility = getPieceMobility(WpawnAttacks, BpawnAttacks);
 	float pawnStructure = evalPawnStructure(WpPerFile, BpPerFile);
+	float rookStructure = evalRookStructure(WpPerFile, BpPerFile);
+	float knightSturcture = evalKnightStructure(WpawnAttacks, BpawnAttacks);
 
 	float score = material
 		+ 0.005f * pieceSquareTable
 		+ 0.001f * mobility
-		+ 0.500f * pawnStructure;
+		+ 0.250f * pawnStructure
+		+ 0.500f * rookStructure
+		+ 0.500f * knightSturcture;
 
 	return score * multiplier;
 }
 
-
 float Evaluator::minimax(int depth, float alpha, float beta) {
-	if (depth <= 0) return evaluate();// quiesce(alpha, beta);
+	
+	if (depth <= 0) return quiesce(alpha, beta); //return evaluate();
+
+	vector<Move> attacks = mg.getAllMoves(false);
+	if (attacks.empty()) return evaluate(depth);
 
 	if (depth > rootDepth) 
 		rootDepth = depth;
-
-	vector<Move> attacks = getAllMoves(false);
 	
 	for (Move attack : attacks) {
+
+		//there is no situation where it is better to promote to a bishop or a rook rather than a queen
+		if (attack.getPromotion() == toB || attack.getPromotion() == toR) continue;
 
 		bitset<64> pEnPassentTargets = EPTargets;
 		bitset<4> pCastleRights = castlingRights;
@@ -250,11 +354,13 @@ float Evaluator::minimax(int depth, float alpha, float beta) {
 }
 
 float Evaluator::quiesce(float alpha, float beta) {
-	int stand_pat = turn == white ? evaluate() : -evaluate();
+	float stand_pat = evaluate(0);
 	if (stand_pat >= beta) return beta;
 	if (stand_pat > alpha) alpha = stand_pat;
 
-	vector<Move> captures = getAllMoves(true);
+	vector<Move> captures = mg.getAllMoves(true);
+
+	if (captures.empty()) return alpha;
 
 	for (Move capture : captures) {
 		bitset<64> pEnPassentTargets = EPTargets;
@@ -267,11 +373,10 @@ float Evaluator::quiesce(float alpha, float beta) {
 		castlingRights = pCastleRights;
 		EPTargets = pEnPassentTargets;
 
-		if (score >= beta) {
-			cout << "snip" << endl;
+		if (score >= beta) 
 			return beta;
-		}
-		if (score > alpha) alpha = score;
+		if (score > alpha) 
+			alpha = score;
 
 	}
 	return alpha;
@@ -286,7 +391,7 @@ Move Evaluator::findBestMove() {
 	return rootMoves.at(bestMove);
 }
 
-void Evaluator::clear() {
+void Evaluator::reset() {
 	rootDepth = 0;
 	rootScores.clear();
 	rootMoves.clear();

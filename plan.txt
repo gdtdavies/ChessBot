@@ -24,10 +24,10 @@ checklist to follow for the progress of the project:
  x Check that the move generation is correct using perft
  =------------------------------------AI--------------------------------------=
  x Make basic board evaluation method (material only)
- - allow the computer to make a move based on the best next board
+ x allow the computer to make a move based on the best next board
  x make basic minimax algoritm
  x add alpha-beta pruning
- - add move ordering
+ x add move ordering
  - implement transposition tables
  - implement random book openings
  - improve the evaluation method
