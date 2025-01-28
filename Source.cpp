@@ -282,9 +282,8 @@ void mouseCallback(int button, int state, int x, int y) {
 
 
 void makeMove(enumSquare origin, enumSquare target, Colour c, Type t, Promotion promoteTo) {
-	
 	Move m = Move(origin, target, c, t);
-	
+
 	Type tt = getPieceType(target);
 	if (tt != None) {
 		HMcounter = -1;
@@ -295,6 +294,12 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t, Promotion 
 
 	pCastlingRights = castlingRights;
 	pEPTargets = EPTargets;
+
+	// Debug: Print bitboards before the move
+	/*if (Wr.test(63) && Br.test(63)) {
+		cout << "Before move: " << m.getMoveCode() << endl;
+		cout << "Wr: " << Wr << endl;
+	}*/
 
 	//empty the square to be taken in all bitboards
 	switch (tt) {
@@ -362,31 +367,31 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t, Promotion 
 					promoteTo == toQ ? Bq.set(target, 1) :
 					__noop;
 			}
-		}	
+		}
 		break;
 	case n:
 		if (c == white) {
-			Wn.set(origin, 0); 
+			Wn.set(origin, 0);
 			Wn.set(target, 1);
 		}
 		else {
-			Bn.set(origin, 0); 
+			Bn.set(origin, 0);
 			Bn.set(target, 1);
 		}
 		break;
 	case b:
 		if (c == white) {
-			Wb.set(origin, 0); 
+			Wb.set(origin, 0);
 			Wb.set(target, 1);
 		}
 		else {
-			Bb.set(origin, 0); 
+			Bb.set(origin, 0);
 			Bb.set(target, 1);
 		}
 		break;
 	case r:
 		if (c == white) {
-			Wr.set(origin, 0); 
+			Wr.set(origin, 0);
 			Wr.set(target, 1);
 		}
 		else {
@@ -407,7 +412,7 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t, Promotion 
 	case k:
 		if (c == white) {
 			Wk.set(origin, 0); Wk.set(target, 1);
-			
+
 			if (origin - target == 2) {
 				Wr.set(0, 0); Wr.set(3, 1);
 				m.isCastle = true;
@@ -443,10 +448,10 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t, Promotion 
 		castlingRights.set(3, 0);
 	}
 
-	if (castlingRights.test(0) && (origin ==  0 || target ==  0)) castlingRights.set(0, 0);
-	if (castlingRights.test(0) && (origin ==  7 || target ==  7)) castlingRights.set(1, 0);
-	if (castlingRights.test(0) && (origin == 56 || target == 56)) castlingRights.set(2, 0);
-	if (castlingRights.test(0) && (origin == 63 || target == 63)) castlingRights.set(3, 0);
+	if (castlingRights.test(0) && (origin == 0 || target == 0)) castlingRights.set(0, 0);
+	if (castlingRights.test(1) && (origin == 7 || target == 7)) castlingRights.set(1, 0);
+	if (castlingRights.test(2) && (origin == 56 || target == 56)) castlingRights.set(2, 0);
+	if (castlingRights.test(3) && (origin == 63 || target == 63)) castlingRights.set(3, 0);
 
 	if (t != p) EPTargets.reset();
 
@@ -455,8 +460,17 @@ void makeMove(enumSquare origin, enumSquare target, Colour c, Type t, Promotion 
 	if (c == black)
 		FMcounter++;
 
+	// Debug: Print bitboards after the move
+	/*if (Wr.test(63) && Br.test(63)) {
+		cout << "After move: " << m.getMoveCode() << endl;
+		cout << "Wr: " << Wr << endl;
+	}*/
+
+	
+
 	movesMade.push_back(m);
 }
+
 
 
 void unmakeMove() {
@@ -504,8 +518,9 @@ void unmakeMove() {
 	if (isTake) {
 		if (tt == p)
 			c == white ? Bp.set(d, 1) : Wp.set(d, 1);
-		else if (tt == r)
+		else if (tt == r) {
 			c == white ? Br.set(d, 1) : Wr.set(d, 1);
+		}
 		else if (tt == n)
 			c == white ? Bn.set(d, 1) : Wn.set(d, 1);
 		else if (tt == b)
@@ -963,9 +978,9 @@ int main(int argc, char** argv) {
 	sA.setRayAttacks();
 	kA.setKingAttacks();
 
-	//loadFromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ");
+	loadFromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ");
 	//loadFromFen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 ");
-	loadFromFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1 ");	
+	//loadFromFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1 ");	
 	//loadFromFen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1 ");	
 	//loadFromFen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1 ");
 	//loadFromFen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8 ");

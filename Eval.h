@@ -303,17 +303,17 @@ double Evaluator::evaluate(int depth) {
 
 	float score = material
 		+ 0.005f * pieceSquareTable
-		+ 0.001f * mobility
-		+ 0.250f * pawnStructure
-		+ 0.500f * rookStructure
-		+ 0.500f * knightSturcture;
+		+ 0.010f * mobility
+		+ 0.150f * pawnStructure
+		+ 0.100f * rookStructure
+		+ 0.050f * knightSturcture;
 
 	return score * multiplier;
 }
 
 float Evaluator::minimax(int depth, float alpha, float beta) {
 	
-	if (depth <= 0) return quiesce(alpha, beta); //return evaluate();
+	if (depth <= 0) return quiesce(alpha, beta); //return evaluate(depth);
 
 	vector<Move> attacks = mg.getAllMoves(false);
 	if (attacks.empty()) return evaluate(depth);
@@ -323,17 +323,30 @@ float Evaluator::minimax(int depth, float alpha, float beta) {
 	
 	for (Move attack : attacks) {
 
-		//there is no situation where it is better to promote to a bishop or a rook rather than a queen
+		//there is no situation where it is better to promote to a bishop or a rook rather than a queen (bar the rare case of stalemate)
 		if (attack.getPromotion() == toB || attack.getPromotion() == toR) continue;
 
 		bitset<64> pEnPassentTargets = EPTargets;
 		bitset<4> pCastleRights = castlingRights;
 
+		bitset<64> rooks = Wr;
+
 		makeMove(attack.getOrigin(), attack.getDestination(), attack.getColour(), attack.getType(), attack.getPromotion());
+
+		/*if (attack.getOrigin() == 63)
+			cout << "now" << endl;*/
 			
 		float score = -minimax(depth - 1, -beta, -alpha);
 
+
 		unmakeMove();
+		/*if (attack.getOrigin() == 63)
+			cout << "now" << endl;*/
+
+		/*if (Wr.test(63))
+			cout << "now" << endl;*/
+
+
 		castlingRights = pCastleRights;
 		EPTargets = pEnPassentTargets;
 		
